@@ -13,3 +13,12 @@ app:
   news-sync:
     cron: "0 0 2 * * *"
     zone: "Asia/Shanghai"
+  news-filter:
+    keywords:
+      - energy storage
+      - battery storage
+      - BESS
+      - grid storage
+      - LFP
+      - sodium-ion
+      - flow battery
