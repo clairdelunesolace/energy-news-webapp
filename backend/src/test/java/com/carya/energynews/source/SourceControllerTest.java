@@ -1,0 +1,155 @@
+package com.carya.energynews.source;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+
+import java.time.Instant;
+import java.util.List;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@WebMvcTest(SourceController.class)
+class SourceControllerTest {
+
+    private static final Instant CREATED_AT = Instant.parse("2026-08-19T01:00:00Z");
+    private static final Instant UPDATED_AT = Instant.parse("2026-08-19T02:00:00Z");
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockitoBean
+    private SourceService sourceService;
+
+    @Test
+    void returnsAllSources() throws Exception {
+        when(sourceService.getAll()).thenReturn(List.of(sourceResponse()));
+
+        mockMvc.perform(get("/api/sources"))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$[0].id").value(1))
+                .andExpect(jsonPath("$[0].name").value("Energy Storage News"))
+                .andExpect(jsonPath("$[0].type").value("RSS"))
+                .andExpect(jsonPath("$[0].priority").value("HIGH"))
+                .andExpect(jsonPath("$[0].enabled").value(true));
+    }
+
+    @Test
+    void returnsSourceById() throws Exception {
+        when(sourceService.getById(1L)).thenReturn(sourceResponse());
+
+        mockMvc.perform(get("/api/sources/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.url").value("https://example.com/feed"));
+    }
+
+    @Test
+    void returnsNotFoundProblemWhenSourceDoesNotExist() throws Exception {
+        when(sourceService.getById(99L)).thenThrow(new SourceNotFoundException(99L));
+
+        mockMvc.perform(get("/api/sources/99"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("Source not found"))
+                .andExpect(jsonPath("$.detail").value("Source with id 99 was not found"));
+    }
+
+    @Test
+    void createsSource() throws Exception {
+        CreateSourceRequest request = new CreateSourceRequest(
+                "Energy Storage News",
+                "https://example.com/feed",
+                SourceType.RSS,
+                SourcePriority.HIGH
+        );
+        when(sourceService.create(request)).thenReturn(sourceResponse());
+
+        mockMvc.perform(post("/api/sources")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "Energy Storage News",
+                                  "url": "https://example.com/feed",
+                                  "type": "RSS",
+                                  "priority": "HIGH"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.enabled").value(true))
+                .andExpect(jsonPath("$.createdAt").value("2026-08-19T01:00:00Z"));
+
+        verify(sourceService).create(request);
+    }
+
+    @Test
+    void rejectsInvalidCreateRequest() throws Exception {
+        mockMvc.perform(post("/api/sources")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": " ",
+                                  "url": "",
+                                  "type": null,
+                                  "priority": null
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("Validation failed"))
+                .andExpect(jsonPath("$.errors.name").value("must not be blank"))
+                .andExpect(jsonPath("$.errors.url").value("must not be blank"))
+                .andExpect(jsonPath("$.errors.type").value("must not be null"))
+                .andExpect(jsonPath("$.errors.priority").value("must not be null"));
+
+        verifyNoInteractions(sourceService);
+    }
+
+    @Test
+    void returnsConflictProblemForDuplicateUrl() throws Exception {
+        when(sourceService.create(any(CreateSourceRequest.class)))
+                .thenThrow(new DuplicateSourceUrlException("https://example.com/feed"));
+
+        mockMvc.perform(post("/api/sources")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "Duplicate",
+                                  "url": "https://example.com/feed",
+                                  "type": "API",
+                                  "priority": "MEDIUM"
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("Duplicate source URL"))
+                .andExpect(jsonPath("$.detail")
+                        .value("A source with URL 'https://example.com/feed' already exists"));
+    }
+
+    private static SourceResponse sourceResponse() {
+        return new SourceResponse(
+                1L,
+                "Energy Storage News",
+                "https://example.com/feed",
+                SourceType.RSS,
+                SourcePriority.HIGH,
+                true,
+                CREATED_AT,
+                UPDATED_AT
+        );
+    }
+}
