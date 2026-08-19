@@ -8,3 +8,8 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
+
+app:
+  news-sync:
+    cron: "0 0 2 * * *"
+    zone: "Asia/Shanghai"
