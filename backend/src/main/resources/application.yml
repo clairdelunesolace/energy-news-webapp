@@ -1,0 +1,7 @@
+spring:
+  application:
+    name: energy-news-backend
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/energy_news}
+    username: ${SPRING_DATASOURCE_USERNAME:energy_news}
+    password: ${SPRING_DATASOURCE_PASSWORD:energy_news}
