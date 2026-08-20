@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Service
@@ -36,8 +37,13 @@ public class ArticleService {
     }
 
     @Transactional(readOnly = true)
-    public ArticlePageResponse getAll(int page, int size) {
-        Page<Article> articlePage = articleRepository.findAllNewestFirst(PageRequest.of(page, size));
+    public ArticlePageResponse getAll(int page, int size, Long sourceId, String keyword) {
+        String normalizedKeyword = normalizeKeyword(keyword);
+        Page<Article> articlePage = articleRepository.findAllFiltered(
+                sourceId,
+                normalizedKeyword,
+                PageRequest.of(page, size)
+        );
         List<Article> articles = articlePage.getContent();
         Map<Long, ArticleTranslation> translations = loadSuccessfulTranslations(articles);
         List<ArticleResponse> content = articles.stream()
@@ -52,6 +58,13 @@ public class ArticleService {
                 articlePage.isFirst(),
                 articlePage.isLast()
         );
+    }
+
+    private static String normalizeKeyword(String keyword) {
+        if (keyword == null || keyword.isBlank()) {
+            return null;
+        }
+        return keyword.trim().toLowerCase(Locale.ROOT);
     }
 
     @Transactional(readOnly = true)

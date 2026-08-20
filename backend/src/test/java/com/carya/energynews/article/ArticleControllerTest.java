@@ -39,7 +39,7 @@ class ArticleControllerTest {
 
     @Test
     void returnsDefaultArticlePage() throws Exception {
-        when(articleService.getAll(0, 20)).thenReturn(new ArticlePageResponse(
+        when(articleService.getAll(0, 20, null, null)).thenReturn(new ArticlePageResponse(
                 List.of(articleResponse()),
                 0,
                 20,
@@ -67,12 +67,12 @@ class ArticleControllerTest {
                 .andExpect(jsonPath("$.first").value(true))
                 .andExpect(jsonPath("$.last").value(true));
 
-        verify(articleService).getAll(0, 20);
+        verify(articleService).getAll(0, 20, null, null);
     }
 
     @Test
     void acceptsCustomPageAndSize() throws Exception {
-        when(articleService.getAll(2, 5)).thenReturn(new ArticlePageResponse(
+        when(articleService.getAll(2, 5, null, null)).thenReturn(new ArticlePageResponse(
                 List.of(),
                 2,
                 5,
@@ -92,7 +92,30 @@ class ArticleControllerTest {
                 .andExpect(jsonPath("$.first").value(false))
                 .andExpect(jsonPath("$.last").value(true));
 
-        verify(articleService).getAll(2, 5);
+        verify(articleService).getAll(2, 5, null, null);
+    }
+
+    @Test
+    void forwardsOptionalSourceAndKeywordFilters() throws Exception {
+        when(articleService.getAll(1, 10, 3L, "Battery")).thenReturn(new ArticlePageResponse(
+                List.of(),
+                1,
+                10,
+                0,
+                0,
+                false,
+                true
+        ));
+
+        mockMvc.perform(get("/api/articles")
+                        .param("page", "1")
+                        .param("size", "10")
+                        .param("sourceId", "3")
+                        .param("keyword", "Battery"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isEmpty());
+
+        verify(articleService).getAll(1, 10, 3L, "Battery");
     }
 
     @Test

@@ -26,12 +26,14 @@ public class ArticleController {
     @GetMapping
     public ArticlePageResponse getAll(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) Long sourceId,
+            @RequestParam(required = false) String keyword
     ) {
         if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
             throw new InvalidArticlePageException();
         }
-        return articleService.getAll(page, size);
+        return articleService.getAll(page, size, sourceId, keyword);
     }
 
     @GetMapping("/{id}")

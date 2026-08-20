@@ -134,8 +134,8 @@ class ArticleRepositoryTest {
         );
         entityManager.clear();
 
-        Page<Article> firstPage = articleRepository.findAllNewestFirst(PageRequest.of(0, 4));
-        Page<Article> secondPage = articleRepository.findAllNewestFirst(PageRequest.of(1, 4));
+        Page<Article> firstPage = articleRepository.findAllFiltered(null, null, PageRequest.of(0, 4));
+        Page<Article> secondPage = articleRepository.findAllFiltered(null, null, PageRequest.of(1, 4));
 
         assertThat(firstPage.getContent())
                 .extracting(Article::getId)
@@ -157,6 +157,141 @@ class ArticleRepositoryTest {
                 assertThat(entityManager.getEntityManagerFactory().getPersistenceUnitUtil()
                         .isLoaded(article, "source")).isTrue()
         );
+    }
+
+    @Test
+    void filtersBySourceAndCaseInsensitiveKeywordInTitleOrDescription() {
+        Source selectedSource = saveSource("filter-selected");
+        Source otherSource = saveSource("filter-other");
+        Article titleMatch = saveArticle(
+                selectedSource,
+                "filter-title-match",
+                "Battery storage deployment",
+                null,
+                Instant.parse("2026-08-20T12:00:00Z"),
+                COLLECTED_AT
+        );
+        Article descriptionMatch = saveArticle(
+                selectedSource,
+                "filter-description-match",
+                "Grid project commissioned",
+                "The project includes a BATTERY system",
+                Instant.parse("2026-08-19T12:00:00Z"),
+                COLLECTED_AT
+        );
+        Article sourceOnly = saveArticle(
+                selectedSource,
+                "filter-source-only",
+                "Solar project commissioned",
+                "Photovoltaic generation",
+                Instant.parse("2026-08-21T12:00:00Z"),
+                COLLECTED_AT
+        );
+        Article keywordOnly = saveArticle(
+                otherSource,
+                "filter-keyword-only",
+                "Battery project from another source",
+                null,
+                Instant.parse("2026-08-22T12:00:00Z"),
+                COLLECTED_AT
+        );
+        entityManager.clear();
+
+        Page<Article> sourceResults = articleRepository.findAllFiltered(
+                selectedSource.getId(),
+                null,
+                PageRequest.of(0, 10)
+        );
+        Page<Article> keywordResults = articleRepository.findAllFiltered(
+                null,
+                "battery",
+                PageRequest.of(0, 10)
+        );
+        Page<Article> combinedResults = articleRepository.findAllFiltered(
+                selectedSource.getId(),
+                "battery",
+                PageRequest.of(0, 10)
+        );
+
+        assertThat(sourceResults.getContent())
+                .extracting(Article::getId)
+                .containsExactly(sourceOnly.getId(), titleMatch.getId(), descriptionMatch.getId());
+        assertThat(keywordResults.getContent())
+                .extracting(Article::getId)
+                .containsExactly(keywordOnly.getId(), titleMatch.getId(), descriptionMatch.getId());
+        assertThat(combinedResults.getContent())
+                .extracting(Article::getId)
+                .containsExactly(titleMatch.getId(), descriptionMatch.getId());
+    }
+
+    @Test
+    void paginatesFilteredResultsAndReturnsValidEmptyPageMetadata() {
+        Source source = saveSource("filter-paging");
+        Article newest = saveArticle(
+                source,
+                "filter-paging-newest",
+                "Newest storage article",
+                null,
+                Instant.parse("2026-08-20T12:00:00Z"),
+                COLLECTED_AT
+        );
+        Article middle = saveArticle(
+                source,
+                "filter-paging-middle",
+                "Middle storage article",
+                null,
+                Instant.parse("2026-08-19T12:00:00Z"),
+                COLLECTED_AT
+        );
+        Article oldest = saveArticle(
+                source,
+                "filter-paging-oldest",
+                "Oldest storage article",
+                null,
+                Instant.parse("2026-08-18T12:00:00Z"),
+                COLLECTED_AT
+        );
+        saveArticle(
+                source,
+                "filter-paging-non-match",
+                "Unrelated market article",
+                null,
+                Instant.parse("2026-08-21T12:00:00Z"),
+                COLLECTED_AT
+        );
+        entityManager.clear();
+
+        Page<Article> firstPage = articleRepository.findAllFiltered(
+                null,
+                "storage",
+                PageRequest.of(0, 2)
+        );
+        Page<Article> secondPage = articleRepository.findAllFiltered(
+                null,
+                "storage",
+                PageRequest.of(1, 2)
+        );
+        Page<Article> noMatches = articleRepository.findAllFiltered(
+                Long.MAX_VALUE,
+                null,
+                PageRequest.of(0, 20)
+        );
+
+        assertThat(firstPage.getContent())
+                .extracting(Article::getId)
+                .containsExactly(newest.getId(), middle.getId());
+        assertThat(secondPage.getContent())
+                .extracting(Article::getId)
+                .containsExactly(oldest.getId());
+        assertThat(firstPage.getTotalElements()).isEqualTo(3);
+        assertThat(firstPage.getTotalPages()).isEqualTo(2);
+        assertThat(firstPage.isLast()).isFalse();
+        assertThat(secondPage.isLast()).isTrue();
+        assertThat(noMatches.getContent()).isEmpty();
+        assertThat(noMatches.getTotalElements()).isZero();
+        assertThat(noMatches.getTotalPages()).isZero();
+        assertThat(noMatches.isFirst()).isTrue();
+        assertThat(noMatches.isLast()).isTrue();
     }
 
     @Test
@@ -247,12 +382,31 @@ class ArticleRepositoryTest {
             Instant publishedAt,
             Instant collectedAt
     ) {
-        Article article = new Article(
+        return saveArticle(
+                source,
+                suffix,
                 "Article " + suffix,
+                null,
+                publishedAt,
+                collectedAt
+        );
+    }
+
+    private Article saveArticle(
+            Source source,
+            String suffix,
+            String title,
+            String description,
+            Instant publishedAt,
+            Instant collectedAt
+    ) {
+        Article article = new Article(
+                title,
                 "https://example.com/articles/" + suffix,
                 source,
                 collectedAt
         );
+        article.setDescription(description);
         article.setPublishedAt(publishedAt);
         return articleRepository.saveAndFlush(article);
     }
