@@ -10,20 +10,22 @@
 
   --color-background: #f3f6f4;
   --color-surface: #ffffff;
+  --color-surface-muted: #eaf0ec;
   --color-text-primary: #17231d;
   --color-text-secondary: #607068;
   --color-accent: #176b4d;
   --color-accent-strong: #0f5039;
-  --color-border: #dce5df;
+  --color-border: #d5e0d9;
   --color-error: #a13c3c;
 
   --spacing-1: 0.25rem;
   --spacing-2: 0.5rem;
   --spacing-3: 0.75rem;
   --spacing-4: 1rem;
+  --spacing-5: 1.25rem;
   --spacing-6: 1.5rem;
   --spacing-8: 2rem;
-  --spacing-12: 3rem;
+  --spacing-10: 2.5rem;
 
   --radius-small: 0.375rem;
   --content-width: 70rem;
@@ -38,6 +40,12 @@ body {
   min-width: 20rem;
   min-height: 100vh;
   background: var(--color-background);
+}
+
+button,
+input,
+select {
+  font: inherit;
 }
 
 a {
@@ -70,9 +78,7 @@ a {
   text-decoration: none;
 }
 
-.app-header__section,
-.page-eyebrow,
-.article-preview__source {
+.app-header__section {
   color: var(--color-text-secondary);
   font-size: 0.8125rem;
 }
@@ -80,80 +86,205 @@ a {
 .page-shell {
   width: min(100% - 2 * var(--spacing-6), var(--content-width));
   margin: 0 auto;
-  padding: var(--spacing-12) 0;
+  padding: var(--spacing-10) 0;
 }
 
-.page-eyebrow {
-  margin: 0 0 var(--spacing-2);
-  color: var(--color-accent);
-  font-weight: 650;
-  letter-spacing: 0.08em;
+.feed-page__heading {
+  margin-bottom: var(--spacing-8);
 }
 
-h1 {
+.feed-page__heading h1 {
   margin: 0;
-  font-size: clamp(2rem, 5vw, 3.25rem);
-  line-height: 1.1;
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  line-height: 1.15;
 }
 
-.page-introduction {
-  max-width: 40rem;
-  margin: var(--spacing-4) 0 var(--spacing-8);
+.feed-page__heading p {
+  max-width: 42rem;
+  margin: var(--spacing-3) 0 0;
   color: var(--color-text-secondary);
-  line-height: 1.7;
+  line-height: 1.65;
 }
 
-.article-preview-list {
+.feed-toolbar {
+  display: grid;
+  grid-template-columns: minmax(14rem, 1fr) minmax(12rem, 18rem) auto;
+  gap: var(--spacing-3);
+  align-items: end;
+  padding: var(--spacing-4);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.feed-toolbar__field {
+  display: grid;
+  min-width: 0;
+  gap: var(--spacing-2);
+}
+
+.feed-toolbar__label {
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+
+.feed-toolbar input,
+.feed-toolbar select {
+  width: 100%;
+  min-width: 0;
+  height: 2.75rem;
+  padding: 0 var(--spacing-3);
+  border: 1px solid #b9c8bf;
+  border-radius: var(--radius-small);
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+}
+
+.feed-toolbar input:focus-visible,
+.feed-toolbar select:focus-visible,
+.button:focus-visible,
+.article-list-item__title a:focus-visible {
+  outline: 3px solid rgb(23 107 77 / 20%);
+  outline-offset: 2px;
+}
+
+.feed-toolbar select:disabled {
+  color: var(--color-text-secondary);
+  background: var(--color-surface-muted);
+}
+
+.feed-toolbar__note {
+  color: var(--color-error);
+  font-size: 0.75rem;
+}
+
+.button {
+  min-height: 2.75rem;
+  padding: 0 var(--spacing-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-small);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.button--primary {
+  color: #ffffff;
+  background: var(--color-accent);
+}
+
+.button--primary:hover {
+  background: var(--color-accent-strong);
+}
+
+.button--secondary {
+  border-color: #b9c8bf;
+  color: var(--color-accent-strong);
+  background: var(--color-surface);
+}
+
+.button--secondary:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  background: var(--color-surface-muted);
+}
+
+.button:disabled {
+  color: #8a9790;
+  background: var(--color-surface-muted);
+  cursor: not-allowed;
+}
+
+.article-feed__results {
+  margin-top: var(--spacing-6);
+}
+
+.article-feed__list {
   margin: 0;
   padding: 0;
   border-top: 1px solid var(--color-border);
   list-style: none;
 }
 
-.article-preview {
-  display: grid;
-  gap: var(--spacing-2);
+.article-list-item {
   padding: var(--spacing-6) 0;
   border-bottom: 1px solid var(--color-border);
 }
 
-.article-preview__source {
+.article-list-item__metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
   font-weight: 650;
 }
 
-.article-preview__title {
-  width: fit-content;
-  font-size: clamp(1.125rem, 2vw, 1.375rem);
-  font-weight: 680;
+.article-list-item__title {
+  max-width: 56rem;
+  margin: var(--spacing-2) 0 var(--spacing-3);
+  font-size: clamp(1.2rem, 2vw, 1.45rem);
   line-height: 1.45;
-  text-decoration-color: transparent;
-  text-underline-offset: 0.2em;
 }
 
-.article-preview__title:hover,
-.article-preview__title:focus-visible {
+.article-list-item__title a {
+  text-decoration-color: transparent;
+  text-underline-offset: 0.18em;
+}
+
+.article-list-item__title a:hover,
+.article-list-item__title a:focus-visible {
   color: var(--color-accent-strong);
   text-decoration-color: currentColor;
 }
 
-.article-preview__original,
-.status-message {
+.article-list-item__description {
+  max-width: 52rem;
   margin: 0;
+  color: #46564e;
+  line-height: 1.7;
+}
+
+.article-list-item__original-title {
+  max-width: 52rem;
+  margin: var(--spacing-3) 0 0;
   color: var(--color-text-secondary);
-  line-height: 1.6;
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+.article-list-item__original-title::before {
+  content: "英文原文：";
 }
 
 .status-message {
-  padding: var(--spacing-6) 0;
+  margin: 0;
+  padding: var(--spacing-8) var(--spacing-4);
   border-top: 1px solid var(--color-border);
   border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  text-align: center;
 }
 
 .status-message--error {
   color: var(--color-error);
 }
 
-@media (max-width: 40rem) {
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-4);
+  padding-top: var(--spacing-6);
+}
+
+.pagination__status {
+  min-width: 7rem;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+@media (max-width: 44rem) {
   .app-header__content,
   .page-shell {
     width: min(100% - 2 * var(--spacing-4), var(--content-width));
@@ -163,7 +294,28 @@ h1 {
     padding: var(--spacing-8) 0;
   }
 
-  .page-introduction {
+  .feed-page__heading {
     margin-bottom: var(--spacing-6);
+  }
+
+  .feed-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .feed-toolbar__submit {
+    width: 100%;
+  }
+
+  .article-list-item {
+    padding: var(--spacing-5) 0;
+  }
+
+  .pagination {
+    justify-content: space-between;
+    gap: var(--spacing-2);
+  }
+
+  .pagination .button {
+    padding: 0 var(--spacing-3);
   }
 }
