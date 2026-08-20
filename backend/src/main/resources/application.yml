@@ -10,6 +10,10 @@ spring:
       ddl-auto: update
 
 app:
+  translation:
+    deepl:
+      base-url: "${DEEPL_BASE_URL:https://api-free.deepl.com}"
+      api-key: "${DEEPL_API_KEY:}"
   news-sync:
     cron: "0 0 2 * * *"
     zone: "Asia/Shanghai"
