@@ -15,6 +15,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
@@ -51,16 +53,18 @@ class ArticleServiceTest {
         ArticleTranslation translation = translation(article, TranslationStatus.SUCCESS);
         translation.setTitle("储能扩张");
         translation.setDescription("中文摘要");
-        when(articleRepository.findAll()).thenReturn(List.of(article));
+        PageRequest pageRequest = PageRequest.of(0, 20);
+        when(articleRepository.findAllNewestFirst(pageRequest))
+                .thenReturn(new PageImpl<>(List.of(article), pageRequest, 1));
         when(articleTranslationRepository.findAllByArticleIdInAndLanguageAndStatus(
                 List.of(1L),
                 TranslationLanguage.ZH_CN,
                 TranslationStatus.SUCCESS
         )).thenReturn(List.of(translation));
 
-        List<ArticleResponse> responses = articleService.getAll();
+        ArticlePageResponse page = articleService.getAll(0, 20);
 
-        assertThat(responses).singleElement().satisfies(response -> {
+        assertThat(page.content()).singleElement().satisfies(response -> {
             assertThat(response.id()).isEqualTo(1L);
             assertThat(response.source()).isEqualTo(new ArticleSourceResponse(7L, "Energy Storage News"));
             assertThat(response.original()).isEqualTo(new ArticleOriginalResponse(
@@ -77,6 +81,61 @@ class ArticleServiceTest {
         });
         verify(articleTranslationRepository).findAllByArticleIdInAndLanguageAndStatus(
                 List.of(1L),
+                TranslationLanguage.ZH_CN,
+                TranslationStatus.SUCCESS
+        );
+        assertThat(page.page()).isZero();
+        assertThat(page.size()).isEqualTo(20);
+        assertThat(page.totalElements()).isEqualTo(1);
+        assertThat(page.totalPages()).isEqualTo(1);
+        assertThat(page.first()).isTrue();
+        assertThat(page.last()).isTrue();
+    }
+
+    @Test
+    void returnsRequestedPageMetadataAndSkipsTranslationLookupForEmptyPage() {
+        PageRequest pageRequest = PageRequest.of(2, 5);
+        when(articleRepository.findAllNewestFirst(pageRequest))
+                .thenReturn(new PageImpl<>(List.of(), pageRequest, 14));
+
+        ArticlePageResponse page = articleService.getAll(2, 5);
+
+        assertThat(page.content()).isEmpty();
+        assertThat(page.page()).isEqualTo(2);
+        assertThat(page.size()).isEqualTo(5);
+        assertThat(page.totalElements()).isEqualTo(14);
+        assertThat(page.totalPages()).isEqualTo(3);
+        assertThat(page.first()).isFalse();
+        assertThat(page.last()).isTrue();
+        verifyNoInteractions(articleTranslationRepository);
+    }
+
+    @Test
+    void pagedListDoesNotExposeMissingPendingOrFailedTranslations() {
+        Article missing = article(1L, SourceLanguage.EN);
+        Article pendingArticle = article(2L, SourceLanguage.EN);
+        Article failedArticle = article(3L, SourceLanguage.EN);
+        ArticleTranslation pending = translation(pendingArticle, TranslationStatus.PENDING);
+        ArticleTranslation failed = translation(failedArticle, TranslationStatus.FAILED);
+        PageRequest pageRequest = PageRequest.of(0, 20);
+        when(articleRepository.findAllNewestFirst(pageRequest)).thenReturn(new PageImpl<>(
+                List.of(missing, pendingArticle, failedArticle),
+                pageRequest,
+                3
+        ));
+        when(articleTranslationRepository.findAllByArticleIdInAndLanguageAndStatus(
+                List.of(1L, 2L, 3L),
+                TranslationLanguage.ZH_CN,
+                TranslationStatus.SUCCESS
+        )).thenReturn(List.of(pending, failed));
+
+        ArticlePageResponse page = articleService.getAll(0, 20);
+
+        assertThat(page.content())
+                .extracting(ArticleResponse::translation)
+                .containsOnlyNulls();
+        verify(articleTranslationRepository).findAllByArticleIdInAndLanguageAndStatus(
+                List.of(1L, 2L, 3L),
                 TranslationLanguage.ZH_CN,
                 TranslationStatus.SUCCESS
         );
@@ -261,9 +320,13 @@ class ArticleServiceTest {
     }
 
     private static Article article(SourceLanguage language) {
+        return article(1L, language);
+    }
+
+    private static Article article(long id, SourceLanguage language) {
         Article article = new Article(
                 "Stored article",
-                "https://example.com/articles/stored",
+                "https://example.com/articles/stored-" + id,
                 source(language),
                 Instant.parse("2026-08-19T06:00:00Z")
         );
@@ -271,7 +334,7 @@ class ArticleServiceTest {
         article.setContent("Original content");
         article.setPublishedAt(Instant.parse("2026-08-18T12:00:00Z"));
         article.onCreate();
-        ReflectionTestUtils.setField(article, "id", 1L);
+        ReflectionTestUtils.setField(article, "id", id);
         return article;
     }
 

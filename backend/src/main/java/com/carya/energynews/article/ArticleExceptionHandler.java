@@ -34,6 +34,13 @@ public class ArticleExceptionHandler {
         return problem;
     }
 
+    @ExceptionHandler(InvalidArticlePageException.class)
+    public ProblemDetail handleInvalidPage(InvalidArticlePageException exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, exception.getMessage());
+        problem.setTitle("Invalid pagination");
+        return problem;
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail handleValidation(MethodArgumentNotValidException exception) {
         Map<String, String> errors = new LinkedHashMap<>();

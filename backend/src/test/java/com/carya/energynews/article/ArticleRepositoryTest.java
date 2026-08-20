@@ -10,6 +10,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 
 import java.time.Instant;
 
@@ -92,6 +94,72 @@ class ArticleRepositoryTest {
     }
 
     @Test
+    void pagesArticlesWithNewestStableNullSafeOrderingAndLoadedSources() {
+        Source source = saveSource("paging-order");
+        Article oldestPublished = saveArticle(
+                source,
+                "oldest-published",
+                Instant.parse("2026-08-17T12:00:00Z"),
+                Instant.parse("2026-08-19T01:00:00Z")
+        );
+        Article tiedFirst = saveArticle(
+                source,
+                "tied-first",
+                Instant.parse("2026-08-18T12:00:00Z"),
+                Instant.parse("2026-08-19T02:00:00Z")
+        );
+        Article tiedSecond = saveArticle(
+                source,
+                "tied-second",
+                Instant.parse("2026-08-18T12:00:00Z"),
+                Instant.parse("2026-08-19T02:00:00Z")
+        );
+        Article newestPublished = saveArticle(
+                source,
+                "newest-published",
+                Instant.parse("2026-08-19T12:00:00Z"),
+                Instant.parse("2026-08-19T03:00:00Z")
+        );
+        Article nullPublishedOlder = saveArticle(
+                source,
+                "null-published-older",
+                null,
+                Instant.parse("2026-08-19T04:00:00Z")
+        );
+        Article nullPublishedNewer = saveArticle(
+                source,
+                "null-published-newer",
+                null,
+                Instant.parse("2026-08-20T04:00:00Z")
+        );
+        entityManager.clear();
+
+        Page<Article> firstPage = articleRepository.findAllNewestFirst(PageRequest.of(0, 4));
+        Page<Article> secondPage = articleRepository.findAllNewestFirst(PageRequest.of(1, 4));
+
+        assertThat(firstPage.getContent())
+                .extracting(Article::getId)
+                .containsExactly(
+                        newestPublished.getId(),
+                        tiedSecond.getId(),
+                        tiedFirst.getId(),
+                        oldestPublished.getId()
+                );
+        assertThat(secondPage.getContent())
+                .extracting(Article::getId)
+                .containsExactly(nullPublishedNewer.getId(), nullPublishedOlder.getId());
+        assertThat(firstPage.getTotalElements()).isEqualTo(6);
+        assertThat(firstPage.getTotalPages()).isEqualTo(2);
+        assertThat(firstPage.isFirst()).isTrue();
+        assertThat(firstPage.isLast()).isFalse();
+        assertThat(secondPage.isLast()).isTrue();
+        assertThat(firstPage.getContent()).allSatisfy(article ->
+                assertThat(entityManager.getEntityManagerFactory().getPersistenceUnitUtil()
+                        .isLoaded(article, "source")).isTrue()
+        );
+    }
+
+    @Test
     void rejectsDuplicateUrl() {
         Source source = saveSource("duplicate");
         articleRepository.saveAndFlush(new Article(
@@ -171,5 +239,21 @@ class ArticleRepositoryTest {
                 SourceType.RSS,
                 SourcePriority.MEDIUM
         ));
+    }
+
+    private Article saveArticle(
+            Source source,
+            String suffix,
+            Instant publishedAt,
+            Instant collectedAt
+    ) {
+        Article article = new Article(
+                "Article " + suffix,
+                "https://example.com/articles/" + suffix,
+                source,
+                collectedAt
+        );
+        article.setPublishedAt(publishedAt);
+        return articleRepository.saveAndFlush(article);
     }
 }

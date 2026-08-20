@@ -8,6 +8,8 @@ import com.carya.energynews.translation.ArticleTranslationRepository;
 import com.carya.energynews.translation.TranslationLanguage;
 import com.carya.energynews.translation.TranslationStatus;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,12 +36,22 @@ public class ArticleService {
     }
 
     @Transactional(readOnly = true)
-    public List<ArticleResponse> getAll() {
-        List<Article> articles = articleRepository.findAll();
+    public ArticlePageResponse getAll(int page, int size) {
+        Page<Article> articlePage = articleRepository.findAllNewestFirst(PageRequest.of(page, size));
+        List<Article> articles = articlePage.getContent();
         Map<Long, ArticleTranslation> translations = loadSuccessfulTranslations(articles);
-        return articles.stream()
+        List<ArticleResponse> content = articles.stream()
                 .map(article -> toResponse(article, translations.get(article.getId())))
                 .toList();
+        return new ArticlePageResponse(
+                content,
+                articlePage.getNumber(),
+                articlePage.getSize(),
+                articlePage.getTotalElements(),
+                articlePage.getTotalPages(),
+                articlePage.isFirst(),
+                articlePage.isLast()
+        );
     }
 
     @Transactional(readOnly = true)

@@ -38,20 +38,81 @@ class ArticleControllerTest {
     private ArticleService articleService;
 
     @Test
-    void returnsAllArticles() throws Exception {
-        when(articleService.getAll()).thenReturn(List.of(articleResponse()));
+    void returnsDefaultArticlePage() throws Exception {
+        when(articleService.getAll(0, 20)).thenReturn(new ArticlePageResponse(
+                List.of(articleResponse()),
+                0,
+                20,
+                1,
+                1,
+                true,
+                true
+        ));
 
         mockMvc.perform(get("/api/articles"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
-                .andExpect(jsonPath("$[0].id").value(1))
-                .andExpect(jsonPath("$[0].source.id").value(7))
-                .andExpect(jsonPath("$[0].source.name").value("Energy Storage News"))
-                .andExpect(jsonPath("$[0].original.language").value("EN"))
-                .andExpect(jsonPath("$[0].original.title").value("Battery storage expands"))
-                .andExpect(jsonPath("$[0].translation.language").value("ZH_CN"))
-                .andExpect(jsonPath("$[0].translation.title").value("电池储能扩张"))
-                .andExpect(jsonPath("$[0].displayTitle").doesNotExist());
+                .andExpect(jsonPath("$.content[0].id").value(1))
+                .andExpect(jsonPath("$.content[0].source.id").value(7))
+                .andExpect(jsonPath("$.content[0].source.name").value("Energy Storage News"))
+                .andExpect(jsonPath("$.content[0].original.language").value("EN"))
+                .andExpect(jsonPath("$.content[0].original.title").value("Battery storage expands"))
+                .andExpect(jsonPath("$.content[0].translation.language").value("ZH_CN"))
+                .andExpect(jsonPath("$.content[0].translation.title").value("电池储能扩张"))
+                .andExpect(jsonPath("$.content[0].displayTitle").doesNotExist())
+                .andExpect(jsonPath("$.page").value(0))
+                .andExpect(jsonPath("$.size").value(20))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.totalPages").value(1))
+                .andExpect(jsonPath("$.first").value(true))
+                .andExpect(jsonPath("$.last").value(true));
+
+        verify(articleService).getAll(0, 20);
+    }
+
+    @Test
+    void acceptsCustomPageAndSize() throws Exception {
+        when(articleService.getAll(2, 5)).thenReturn(new ArticlePageResponse(
+                List.of(),
+                2,
+                5,
+                14,
+                3,
+                false,
+                true
+        ));
+
+        mockMvc.perform(get("/api/articles?page=2&size=5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isEmpty())
+                .andExpect(jsonPath("$.page").value(2))
+                .andExpect(jsonPath("$.size").value(5))
+                .andExpect(jsonPath("$.totalElements").value(14))
+                .andExpect(jsonPath("$.totalPages").value(3))
+                .andExpect(jsonPath("$.first").value(false))
+                .andExpect(jsonPath("$.last").value(true));
+
+        verify(articleService).getAll(2, 5);
+    }
+
+    @Test
+    void rejectsPaginationOutsideAllowedBounds() throws Exception {
+        mockMvc.perform(get("/api/articles?page=-1"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("Invalid pagination"));
+
+        mockMvc.perform(get("/api/articles?size=0"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(get("/api/articles?size=5000"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.detail").value(
+                        "Page must be at least 0 and size must be between 1 and 100"
+                ));
+
+        verifyNoInteractions(articleService);
     }
 
     @Test
