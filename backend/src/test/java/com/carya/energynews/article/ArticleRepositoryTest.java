@@ -134,8 +134,8 @@ class ArticleRepositoryTest {
         );
         entityManager.clear();
 
-        Page<Article> firstPage = articleRepository.findAllFiltered(null, null, PageRequest.of(0, 4));
-        Page<Article> secondPage = articleRepository.findAllFiltered(null, null, PageRequest.of(1, 4));
+        Page<Article> firstPage = articleRepository.findAllFiltered(null, "", PageRequest.of(0, 4));
+        Page<Article> secondPage = articleRepository.findAllFiltered(null, "", PageRequest.of(1, 4));
 
         assertThat(firstPage.getContent())
                 .extracting(Article::getId)
@@ -199,7 +199,7 @@ class ArticleRepositoryTest {
 
         Page<Article> sourceResults = articleRepository.findAllFiltered(
                 selectedSource.getId(),
-                null,
+                "",
                 PageRequest.of(0, 10)
         );
         Page<Article> keywordResults = articleRepository.findAllFiltered(
@@ -273,7 +273,7 @@ class ArticleRepositoryTest {
         );
         Page<Article> noMatches = articleRepository.findAllFiltered(
                 Long.MAX_VALUE,
-                null,
+                "",
                 PageRequest.of(0, 20)
         );
 

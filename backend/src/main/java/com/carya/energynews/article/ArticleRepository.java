@@ -23,8 +23,7 @@ public interface ArticleRepository extends JpaRepository<Article, Long> {
                     JOIN FETCH article.source
                     WHERE (:sourceId IS NULL OR article.source.id = :sourceId)
                       AND (
-                          :keyword IS NULL
-                          OR LOWER(article.title) LIKE CONCAT('%', :keyword, '%')
+                          LOWER(article.title) LIKE CONCAT('%', :keyword, '%')
                           OR LOWER(article.description) LIKE CONCAT('%', :keyword, '%')
                       )
                     ORDER BY
@@ -38,8 +37,7 @@ public interface ArticleRepository extends JpaRepository<Article, Long> {
                     FROM Article article
                     WHERE (:sourceId IS NULL OR article.source.id = :sourceId)
                       AND (
-                          :keyword IS NULL
-                          OR LOWER(article.title) LIKE CONCAT('%', :keyword, '%')
+                          LOWER(article.title) LIKE CONCAT('%', :keyword, '%')
                           OR LOWER(article.description) LIKE CONCAT('%', :keyword, '%')
                       )
                     """

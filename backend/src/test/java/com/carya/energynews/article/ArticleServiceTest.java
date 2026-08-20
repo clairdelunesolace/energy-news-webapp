@@ -48,13 +48,13 @@ class ArticleServiceTest {
     private ArticleService articleService;
 
     @Test
-    void returnsAllArticlesWithSuccessfulTranslationsUsingBatchLookup() {
+    void treatsNullKeywordAsNoFilterAndLoadsSuccessfulTranslationsInBatch() {
         Article article = article(SourceLanguage.EN);
         ArticleTranslation translation = translation(article, TranslationStatus.SUCCESS);
         translation.setTitle("储能扩张");
         translation.setDescription("中文摘要");
         PageRequest pageRequest = PageRequest.of(0, 20);
-        when(articleRepository.findAllFiltered(null, null, pageRequest))
+        when(articleRepository.findAllFiltered(null, "", pageRequest))
                 .thenReturn(new PageImpl<>(List.of(article), pageRequest, 1));
         when(articleTranslationRepository.findAllByArticleIdInAndLanguageAndStatus(
                 List.of(1L),
@@ -79,6 +79,7 @@ class ArticleServiceTest {
                     "中文摘要"
             ));
         });
+        verify(articleRepository).findAllFiltered(null, "", pageRequest);
         verify(articleTranslationRepository).findAllByArticleIdInAndLanguageAndStatus(
                 List.of(1L),
                 TranslationLanguage.ZH_CN,
@@ -95,7 +96,7 @@ class ArticleServiceTest {
     @Test
     void returnsRequestedPageMetadataAndSkipsTranslationLookupForEmptyPage() {
         PageRequest pageRequest = PageRequest.of(2, 5);
-        when(articleRepository.findAllFiltered(null, null, pageRequest))
+        when(articleRepository.findAllFiltered(null, "", pageRequest))
                 .thenReturn(new PageImpl<>(List.of(), pageRequest, 14));
 
         ArticlePageResponse page = articleService.getAll(2, 5, null, null);
@@ -118,7 +119,7 @@ class ArticleServiceTest {
         ArticleTranslation pending = translation(pendingArticle, TranslationStatus.PENDING);
         ArticleTranslation failed = translation(failedArticle, TranslationStatus.FAILED);
         PageRequest pageRequest = PageRequest.of(0, 20);
-        when(articleRepository.findAllFiltered(null, null, pageRequest)).thenReturn(new PageImpl<>(
+        when(articleRepository.findAllFiltered(null, "", pageRequest)).thenReturn(new PageImpl<>(
                 List.of(missing, pendingArticle, failedArticle),
                 pageRequest,
                 3
@@ -144,13 +145,13 @@ class ArticleServiceTest {
     @Test
     void treatsBlankKeywordAsNoKeywordFilter() {
         PageRequest pageRequest = PageRequest.of(0, 20);
-        when(articleRepository.findAllFiltered(3L, null, pageRequest))
+        when(articleRepository.findAllFiltered(3L, "", pageRequest))
                 .thenReturn(new PageImpl<>(List.of(), pageRequest, 0));
 
         ArticlePageResponse page = articleService.getAll(0, 20, 3L, "   ");
 
         assertThat(page.content()).isEmpty();
-        verify(articleRepository).findAllFiltered(3L, null, pageRequest);
+        verify(articleRepository).findAllFiltered(3L, "", pageRequest);
     }
 
     @Test
