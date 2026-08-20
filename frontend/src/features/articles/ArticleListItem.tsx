@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import type { ArticleResponse } from '../../types/articles'
 import { formatArticleDate } from './formatArticleDate'
 
@@ -30,9 +31,7 @@ export function ArticleListItem({ article }: ArticleListItemProps) {
         </div>
 
         <h2 className="article-list-item__title" lang={primaryLanguage}>
-          <a href={article.url} target="_blank" rel="noopener noreferrer">
-            {primaryTitle}
-          </a>
+          <Link to={`/articles/${article.id}`}>{primaryTitle}</Link>
         </h2>
 
         {primaryDescription && (
@@ -46,6 +45,15 @@ export function ArticleListItem({ article }: ArticleListItemProps) {
             {article.original.title}
           </p>
         )}
+
+        <a
+          className="article-list-item__external-link"
+          href={article.url}
+          target="_blank"
+          rel="noreferrer"
+        >
+          查看原文 ↗
+        </a>
       </article>
     </li>
   )

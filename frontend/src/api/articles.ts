@@ -1,5 +1,5 @@
 import { fetchJson } from './client'
-import type { ArticlePageResponse } from '../types/articles'
+import type { ArticlePageResponse, ArticleResponse } from '../types/articles'
 
 export interface GetArticlesParams {
   page?: number
@@ -23,4 +23,8 @@ export function getArticles(
   const url = query ? `/api/articles?${query}` : '/api/articles'
 
   return fetchJson<ArticlePageResponse>(url, { signal })
+}
+
+export function getArticle(id: number, signal?: AbortSignal): Promise<ArticleResponse> {
+  return fetchJson<ArticleResponse>(`/api/articles/${id}`, { signal })
 }
