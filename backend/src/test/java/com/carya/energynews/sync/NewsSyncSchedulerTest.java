@@ -5,6 +5,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.scheduling.annotation.Scheduled;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -12,7 +14,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class NewsSyncSchedulerTest {
 
     @Mock
@@ -32,13 +34,14 @@ class NewsSyncSchedulerTest {
     }
 
     @Test
-    void delegatesScheduledSynchronizationToNewsSyncService() {
+    void delegatesScheduledSynchronizationAndLogsTranslationCounters(CapturedOutput output) {
         when(newsSyncService.syncAllEnabledSources())
-                .thenReturn(new NewsSyncResult(5, 1, 2, 2, 1));
+                .thenReturn(new NewsSyncResult(5, 1, 2, 2, 3, 1, 1));
 
         newsSyncScheduler.runScheduledSync();
 
         verify(newsSyncService).syncAllEnabledSources();
+        assertThat(output).contains("translated=3, translationFailed=1, failedSources=1");
     }
 
     @Test

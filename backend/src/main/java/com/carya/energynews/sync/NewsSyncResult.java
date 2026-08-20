@@ -5,6 +5,8 @@ public record NewsSyncResult(
         int filteredOut,
         int saved,
         int duplicates,
+        int translated,
+        int translationFailed,
         int failedSources
 ) {
 }

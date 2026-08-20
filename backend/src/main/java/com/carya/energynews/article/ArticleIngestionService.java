@@ -26,8 +26,9 @@ public class ArticleIngestionService {
         Source source = sourceRepository.findById(collectedArticle.sourceId())
                 .orElseThrow(() -> new SourceNotFoundException(collectedArticle.sourceId()));
 
-        if (articleRepository.existsByUrl(collectedArticle.url())) {
-            return ArticleIngestionResult.DUPLICATE;
+        Article existingArticle = articleRepository.findByUrl(collectedArticle.url()).orElse(null);
+        if (existingArticle != null) {
+            return ArticleIngestionResult.duplicate(existingArticle);
         }
 
         Article article = new Article(
@@ -39,9 +40,9 @@ public class ArticleIngestionService {
         article.setDescription(collectedArticle.description());
         article.setContent(collectedArticle.content());
         article.setPublishedAt(collectedArticle.publishedAt());
-        articleRepository.save(article);
+        Article savedArticle = articleRepository.saveAndFlush(article);
 
-        return ArticleIngestionResult.SAVED;
+        return ArticleIngestionResult.saved(savedArticle);
     }
 
     @Transactional

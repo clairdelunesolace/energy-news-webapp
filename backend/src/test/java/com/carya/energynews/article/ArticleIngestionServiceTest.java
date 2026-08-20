@@ -12,6 +12,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
 import java.util.List;
@@ -48,16 +49,18 @@ class ArticleIngestionServiceTest {
                 Instant.parse("2026-08-18T12:00:00Z")
         );
         when(sourceRepository.findById(7L)).thenReturn(Optional.of(source));
-        when(articleRepository.existsByUrl(collectedArticle.url())).thenReturn(false);
+        when(articleRepository.findByUrl(collectedArticle.url())).thenReturn(Optional.empty());
+        persistSavedArticles();
         Instant beforeIngestion = Instant.now();
 
         ArticleIngestionResult result = articleIngestionService.ingest(collectedArticle);
 
         Instant afterIngestion = Instant.now();
         ArgumentCaptor<Article> captor = ArgumentCaptor.forClass(Article.class);
-        verify(articleRepository).save(captor.capture());
+        verify(articleRepository).saveAndFlush(captor.capture());
         Article saved = captor.getValue();
-        assertThat(result).isEqualTo(ArticleIngestionResult.SAVED);
+        assertThat(result.status()).isEqualTo(ArticleIngestionResult.Status.SAVED);
+        assertThat(result.article()).isSameAs(saved);
         assertThat(saved.getTitle()).isEqualTo(collectedArticle.title());
         assertThat(saved.getUrl()).isEqualTo(collectedArticle.url());
         assertThat(saved.getDescription()).isEqualTo(collectedArticle.description());
@@ -65,7 +68,7 @@ class ArticleIngestionServiceTest {
         assertThat(saved.getPublishedAt()).isEqualTo(collectedArticle.publishedAt());
         assertThat(saved.getCollectedAt()).isBetween(beforeIngestion, afterIngestion);
         assertThat(saved.getSource()).isSameAs(source);
-        assertThat(saved.getId()).isNull();
+        assertThat(saved.getId()).isEqualTo(13L);
         assertThat(saved.getCreatedAt()).isNull();
         assertThat(saved.getUpdatedAt()).isNull();
     }
@@ -77,13 +80,16 @@ class ArticleIngestionServiceTest {
                 "https://example.com/articles/duplicate",
                 Instant.parse("2026-08-18T12:00:00Z")
         );
-        when(sourceRepository.findById(7L)).thenReturn(Optional.of(source()));
-        when(articleRepository.existsByUrl(collectedArticle.url())).thenReturn(true);
+        Source source = source();
+        Article existing = persistedArticle("Existing article", collectedArticle.url(), source, 23L);
+        when(sourceRepository.findById(7L)).thenReturn(Optional.of(source));
+        when(articleRepository.findByUrl(collectedArticle.url())).thenReturn(Optional.of(existing));
 
         ArticleIngestionResult result = articleIngestionService.ingest(collectedArticle);
 
-        assertThat(result).isEqualTo(ArticleIngestionResult.DUPLICATE);
-        verify(articleRepository, never()).save(any(Article.class));
+        assertThat(result.status()).isEqualTo(ArticleIngestionResult.Status.DUPLICATE);
+        assertThat(result.article()).isSameAs(existing);
+        verify(articleRepository, never()).saveAndFlush(any(Article.class));
     }
 
     @Test
@@ -110,13 +116,14 @@ class ArticleIngestionServiceTest {
                 null
         );
         when(sourceRepository.findById(7L)).thenReturn(Optional.of(source));
-        when(articleRepository.existsByUrl(collectedArticle.url())).thenReturn(false);
+        when(articleRepository.findByUrl(collectedArticle.url())).thenReturn(Optional.empty());
+        persistSavedArticles();
 
         ArticleIngestionResult result = articleIngestionService.ingest(collectedArticle);
 
         ArgumentCaptor<Article> captor = ArgumentCaptor.forClass(Article.class);
-        verify(articleRepository).save(captor.capture());
-        assertThat(result).isEqualTo(ArticleIngestionResult.SAVED);
+        verify(articleRepository).saveAndFlush(captor.capture());
+        assertThat(result.status()).isEqualTo(ArticleIngestionResult.Status.SAVED);
         assertThat(captor.getValue().getPublishedAt()).isNull();
     }
 
@@ -133,15 +140,16 @@ class ArticleIngestionServiceTest {
                 null
         );
         when(sourceRepository.findById(7L)).thenReturn(Optional.of(source()));
-        when(articleRepository.existsByUrl(anyString())).thenReturn(false);
+        when(articleRepository.findByUrl(anyString())).thenReturn(Optional.empty());
+        persistSavedArticles();
 
         List<ArticleIngestionResult> results = articleIngestionService.ingestAll(List.of(first, second));
 
-        assertThat(results).containsExactly(
-                ArticleIngestionResult.SAVED,
-                ArticleIngestionResult.SAVED
+        assertThat(results).extracting(ArticleIngestionResult::status).containsExactly(
+                ArticleIngestionResult.Status.SAVED,
+                ArticleIngestionResult.Status.SAVED
         );
-        verify(articleRepository, times(2)).save(any(Article.class));
+        verify(articleRepository, times(2)).saveAndFlush(any(Article.class));
     }
 
     @Test
@@ -156,20 +164,24 @@ class ArticleIngestionServiceTest {
                 "https://example.com/articles/new-in-batch",
                 null
         );
-        when(sourceRepository.findById(7L)).thenReturn(Optional.of(source()));
-        when(articleRepository.existsByUrl(duplicate.url())).thenReturn(true);
-        when(articleRepository.existsByUrl(newArticle.url())).thenReturn(false);
+        Source source = source();
+        Article existing = persistedArticle("Existing duplicate", duplicate.url(), source, 23L);
+        when(sourceRepository.findById(7L)).thenReturn(Optional.of(source));
+        when(articleRepository.findByUrl(duplicate.url())).thenReturn(Optional.of(existing));
+        when(articleRepository.findByUrl(newArticle.url())).thenReturn(Optional.empty());
+        persistSavedArticles();
 
         List<ArticleIngestionResult> results = articleIngestionService.ingestAll(
                 List.of(duplicate, newArticle)
         );
 
-        assertThat(results).containsExactly(
-                ArticleIngestionResult.DUPLICATE,
-                ArticleIngestionResult.SAVED
+        assertThat(results).extracting(ArticleIngestionResult::status).containsExactly(
+                ArticleIngestionResult.Status.DUPLICATE,
+                ArticleIngestionResult.Status.SAVED
         );
+        assertThat(results.getFirst().article()).isSameAs(existing);
         ArgumentCaptor<Article> captor = ArgumentCaptor.forClass(Article.class);
-        verify(articleRepository).save(captor.capture());
+        verify(articleRepository).saveAndFlush(captor.capture());
         assertThat(captor.getValue().getUrl()).isEqualTo(newArticle.url());
     }
 
@@ -191,5 +203,19 @@ class ArticleIngestionServiceTest {
                 publishedAt,
                 7L
         );
+    }
+
+    private Article persistedArticle(String title, String url, Source source, Long id) {
+        Article article = new Article(title, url, source, Instant.parse("2026-08-20T01:00:00Z"));
+        ReflectionTestUtils.setField(article, "id", id);
+        return article;
+    }
+
+    private void persistSavedArticles() {
+        when(articleRepository.saveAndFlush(any(Article.class))).thenAnswer(invocation -> {
+            Article article = invocation.getArgument(0);
+            ReflectionTestUtils.setField(article, "id", 13L);
+            return article;
+        });
     }
 }

@@ -21,11 +21,13 @@ public class NewsSyncScheduler {
         try {
             NewsSyncResult result = newsSyncService.syncAllEnabledSources();
             LOGGER.info(
-                    "Scheduled news synchronization completed: collected={}, filteredOut={}, saved={}, duplicates={}, failedSources={}",
+                    "Scheduled news synchronization completed: collected={}, filteredOut={}, saved={}, duplicates={}, translated={}, translationFailed={}, failedSources={}",
                     result.collected(),
                     result.filteredOut(),
                     result.saved(),
                     result.duplicates(),
+                    result.translated(),
+                    result.translationFailed(),
                     result.failedSources()
             );
         } catch (Exception exception) {

@@ -73,6 +73,25 @@ class ArticleRepositoryTest {
     }
 
     @Test
+    void findsCanonicalArticleByUrlWithSourceLoaded() {
+        Source source = saveSource("canonical-url");
+        Article saved = articleRepository.saveAndFlush(new Article(
+                "Canonical article",
+                "https://example.com/articles/canonical-url",
+                source,
+                COLLECTED_AT
+        ));
+        entityManager.clear();
+
+        Article loaded = articleRepository.findByUrl(saved.getUrl()).orElseThrow();
+
+        assertThat(loaded.getId()).isEqualTo(saved.getId());
+        assertThat(entityManager.getEntityManagerFactory().getPersistenceUnitUtil()
+                .isLoaded(loaded, "source")).isTrue();
+        assertThat(loaded.getSource().getId()).isEqualTo(source.getId());
+    }
+
+    @Test
     void rejectsDuplicateUrl() {
         Source source = saveSource("duplicate");
         articleRepository.saveAndFlush(new Article(
