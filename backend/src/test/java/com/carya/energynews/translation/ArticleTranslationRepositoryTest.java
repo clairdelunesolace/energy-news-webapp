@@ -13,6 +13,7 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -93,6 +94,43 @@ class ArticleTranslationRepositoryTest {
         ArticleTranslation loaded = found.orElseThrow();
         assertThat(loaded.getId()).isEqualTo(saved.getId());
         assertThat(loaded.getArticle().getId()).isEqualTo(article.getId());
+    }
+
+    @Test
+    void findsOnlySuccessfulTranslationsForReadResponses() {
+        Article successfulArticle = saveArticle("successful-read");
+        Article failedArticle = saveArticle("failed-read");
+        ArticleTranslation successful = new ArticleTranslation(
+                successfulArticle,
+                TranslationLanguage.ZH_CN
+        );
+        successful.setStatus(TranslationStatus.SUCCESS);
+        successful.setTitle("成功翻译");
+        ArticleTranslation failed = new ArticleTranslation(
+                failedArticle,
+                TranslationLanguage.ZH_CN
+        );
+        failed.setStatus(TranslationStatus.FAILED);
+        articleTranslationRepository.saveAllAndFlush(List.of(successful, failed));
+        entityManager.clear();
+
+        Optional<ArticleTranslation> detail = articleTranslationRepository
+                .findByArticleIdAndLanguageAndStatus(
+                        successfulArticle.getId(),
+                        TranslationLanguage.ZH_CN,
+                        TranslationStatus.SUCCESS
+                );
+        List<ArticleTranslation> batch = articleTranslationRepository
+                .findAllByArticleIdInAndLanguageAndStatus(
+                        List.of(successfulArticle.getId(), failedArticle.getId()),
+                        TranslationLanguage.ZH_CN,
+                        TranslationStatus.SUCCESS
+                );
+
+        assertThat(detail).isPresent();
+        assertThat(batch).extracting(ArticleTranslation::getArticle)
+                .extracting(Article::getId)
+                .containsExactly(successfulArticle.getId());
     }
 
     @Test

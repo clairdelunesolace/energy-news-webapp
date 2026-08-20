@@ -1,6 +1,8 @@
 package com.carya.energynews.article;
 
 import com.carya.energynews.source.SourceNotFoundException;
+import com.carya.energynews.source.SourceLanguage;
+import com.carya.energynews.translation.TranslationLanguage;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
@@ -43,10 +45,13 @@ class ArticleControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$[0].id").value(1))
-                .andExpect(jsonPath("$[0].title").value("Battery storage expands"))
-                .andExpect(jsonPath("$[0].sourceId").value(7))
-                .andExpect(jsonPath("$[0].sourceName").value("Energy Storage News"))
-                .andExpect(jsonPath("$[0].source").doesNotExist());
+                .andExpect(jsonPath("$[0].source.id").value(7))
+                .andExpect(jsonPath("$[0].source.name").value("Energy Storage News"))
+                .andExpect(jsonPath("$[0].original.language").value("EN"))
+                .andExpect(jsonPath("$[0].original.title").value("Battery storage expands"))
+                .andExpect(jsonPath("$[0].translation.language").value("ZH_CN"))
+                .andExpect(jsonPath("$[0].translation.title").value("电池储能扩张"))
+                .andExpect(jsonPath("$[0].displayTitle").doesNotExist());
     }
 
     @Test
@@ -57,7 +62,10 @@ class ArticleControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.url").value("https://example.com/articles/storage-expands"))
-                .andExpect(jsonPath("$.collectedAt").value("2026-08-19T06:00:00Z"));
+                .andExpect(jsonPath("$.collectedAt").value("2026-08-19T06:00:00Z"))
+                .andExpect(jsonPath("$.source.id").value(7))
+                .andExpect(jsonPath("$.original.title").value("Battery storage expands"))
+                .andExpect(jsonPath("$.translation.title").value("电池储能扩张"));
     }
 
     @Test
@@ -81,7 +89,7 @@ class ArticleControllerTest {
                 PUBLISHED_AT,
                 7L
         );
-        when(articleService.create(request)).thenReturn(articleResponse());
+        when(articleService.create(request)).thenReturn(createArticleResponse());
 
         mockMvc.perform(post("/api/articles")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -171,6 +179,29 @@ class ArticleControllerTest {
 
     private static ArticleResponse articleResponse() {
         return new ArticleResponse(
+                1L,
+                new ArticleSourceResponse(7L, "Energy Storage News"),
+                "https://example.com/articles/storage-expands",
+                PUBLISHED_AT,
+                COLLECTED_AT,
+                new ArticleOriginalResponse(
+                        SourceLanguage.EN,
+                        "Battery storage expands",
+                        "Article summary",
+                        "Article content"
+                ),
+                new ArticleTranslationResponse(
+                        TranslationLanguage.ZH_CN,
+                        "电池储能扩张",
+                        "中文摘要"
+                ),
+                CREATED_AT,
+                UPDATED_AT
+        );
+    }
+
+    private static CreateArticleResponse createArticleResponse() {
+        return new CreateArticleResponse(
                 1L,
                 "Battery storage expands",
                 "https://example.com/articles/storage-expands",

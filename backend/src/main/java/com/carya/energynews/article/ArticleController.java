@@ -34,7 +34,7 @@ public class ArticleController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ArticleResponse create(@Valid @RequestBody CreateArticleRequest request) {
+    public CreateArticleResponse create(@Valid @RequestBody CreateArticleRequest request) {
         return articleService.create(request);
     }
 }

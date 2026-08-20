@@ -1,8 +1,13 @@
 package com.carya.energynews.article;
 
 import com.carya.energynews.source.Source;
+import com.carya.energynews.source.SourceLanguage;
 import com.carya.energynews.source.SourceNotFoundException;
 import com.carya.energynews.source.SourceRepository;
+import com.carya.energynews.translation.ArticleTranslation;
+import com.carya.energynews.translation.ArticleTranslationRepository;
+import com.carya.energynews.translation.TranslationLanguage;
+import com.carya.energynews.translation.TranslationStatus;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -10,6 +15,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
 import java.util.List;
@@ -21,6 +27,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -32,36 +39,134 @@ class ArticleServiceTest {
     @Mock
     private SourceRepository sourceRepository;
 
+    @Mock
+    private ArticleTranslationRepository articleTranslationRepository;
+
     @InjectMocks
     private ArticleService articleService;
 
     @Test
-    void returnsAllArticlesAsDtosWithoutCompleteSource() {
-        Source source = source(7L, "Energy Storage News");
-        Article article = new Article(
-                "Stored article",
-                "https://example.com/articles/stored",
-                source,
-                Instant.parse("2026-08-19T06:00:00Z")
-        );
-        article.onCreate();
+    void returnsAllArticlesWithSuccessfulTranslationsUsingBatchLookup() {
+        Article article = article(SourceLanguage.EN);
+        ArticleTranslation translation = translation(article, TranslationStatus.SUCCESS);
+        translation.setTitle("储能扩张");
+        translation.setDescription("中文摘要");
         when(articleRepository.findAll()).thenReturn(List.of(article));
+        when(articleTranslationRepository.findAllByArticleIdInAndLanguageAndStatus(
+                List.of(1L),
+                TranslationLanguage.ZH_CN,
+                TranslationStatus.SUCCESS
+        )).thenReturn(List.of(translation));
 
         List<ArticleResponse> responses = articleService.getAll();
 
-        assertThat(responses).containsExactly(new ArticleResponse(
-                null,
-                "Stored article",
-                "https://example.com/articles/stored",
-                null,
-                null,
-                null,
-                Instant.parse("2026-08-19T06:00:00Z"),
-                7L,
-                "Energy Storage News",
-                article.getCreatedAt(),
-                article.getUpdatedAt()
+        assertThat(responses).singleElement().satisfies(response -> {
+            assertThat(response.id()).isEqualTo(1L);
+            assertThat(response.source()).isEqualTo(new ArticleSourceResponse(7L, "Energy Storage News"));
+            assertThat(response.original()).isEqualTo(new ArticleOriginalResponse(
+                    SourceLanguage.EN,
+                    "Stored article",
+                    "Original summary",
+                    "Original content"
+            ));
+            assertThat(response.translation()).isEqualTo(new ArticleTranslationResponse(
+                    TranslationLanguage.ZH_CN,
+                    "储能扩张",
+                    "中文摘要"
+            ));
+        });
+        verify(articleTranslationRepository).findAllByArticleIdInAndLanguageAndStatus(
+                List.of(1L),
+                TranslationLanguage.ZH_CN,
+                TranslationStatus.SUCCESS
+        );
+    }
+
+    @Test
+    void returnsArticleByIdWithSuccessfulTranslation() {
+        Article article = article(SourceLanguage.EN);
+        ArticleTranslation translation = translation(article, TranslationStatus.SUCCESS);
+        translation.setTitle("中文标题");
+        when(articleRepository.findById(1L)).thenReturn(Optional.of(article));
+        when(articleTranslationRepository.findByArticleIdAndLanguageAndStatus(
+                1L,
+                TranslationLanguage.ZH_CN,
+                TranslationStatus.SUCCESS
+        )).thenReturn(Optional.of(translation));
+
+        ArticleResponse response = articleService.getById(1L);
+
+        assertThat(response.original().language()).isEqualTo(SourceLanguage.EN);
+        assertThat(response.translation()).isEqualTo(new ArticleTranslationResponse(
+                TranslationLanguage.ZH_CN,
+                "中文标题",
+                null
         ));
+    }
+
+    @Test
+    void returnsNullTranslationWhenNoSuccessfulTranslationExists() {
+        Article article = article(SourceLanguage.EN);
+        when(articleRepository.findById(1L)).thenReturn(Optional.of(article));
+        when(articleTranslationRepository.findByArticleIdAndLanguageAndStatus(
+                1L,
+                TranslationLanguage.ZH_CN,
+                TranslationStatus.SUCCESS
+        )).thenReturn(Optional.empty());
+
+        ArticleResponse response = articleService.getById(1L);
+
+        assertThat(response.translation()).isNull();
+    }
+
+    @Test
+    void doesNotExposeFailedTranslation() {
+        Article article = article(SourceLanguage.EN);
+        ArticleTranslation failed = translation(article, TranslationStatus.FAILED);
+        failed.setTitle("Stale translated title");
+        when(articleRepository.findById(1L)).thenReturn(Optional.of(article));
+        when(articleTranslationRepository.findByArticleIdAndLanguageAndStatus(
+                1L,
+                TranslationLanguage.ZH_CN,
+                TranslationStatus.SUCCESS
+        )).thenReturn(Optional.of(failed));
+
+        ArticleResponse response = articleService.getById(1L);
+
+        assertThat(response.translation()).isNull();
+    }
+
+    @Test
+    void doesNotExposePendingTranslation() {
+        Article article = article(SourceLanguage.EN);
+        ArticleTranslation pending = translation(article, TranslationStatus.PENDING);
+        pending.setTitle("Partial translated title");
+        when(articleRepository.findById(1L)).thenReturn(Optional.of(article));
+        when(articleTranslationRepository.findByArticleIdAndLanguageAndStatus(
+                1L,
+                TranslationLanguage.ZH_CN,
+                TranslationStatus.SUCCESS
+        )).thenReturn(Optional.of(pending));
+
+        ArticleResponse response = articleService.getById(1L);
+
+        assertThat(response.translation()).isNull();
+    }
+
+    @Test
+    void reportsChineseSourceLanguageFromSource() {
+        Article article = article(SourceLanguage.ZH_CN);
+        when(articleRepository.findById(1L)).thenReturn(Optional.of(article));
+        when(articleTranslationRepository.findByArticleIdAndLanguageAndStatus(
+                1L,
+                TranslationLanguage.ZH_CN,
+                TranslationStatus.SUCCESS
+        )).thenReturn(Optional.empty());
+
+        ArticleResponse response = articleService.getById(1L);
+
+        assertThat(response.original().language()).isEqualTo(SourceLanguage.ZH_CN);
+        assertThat(response.translation()).isNull();
     }
 
     @Test
@@ -71,6 +176,7 @@ class ArticleServiceTest {
         assertThatThrownBy(() -> articleService.getById(42L))
                 .isInstanceOf(ArticleNotFoundException.class)
                 .hasMessage("Article with id 42 was not found");
+        verifyNoInteractions(articleTranslationRepository);
     }
 
     @Test
@@ -85,9 +191,9 @@ class ArticleServiceTest {
     }
 
     @Test
-    void createsArticleWithBackendCollectionTimeAndResolvedSource() {
+    void createsArticleWithExistingFlatResponseAndBackendCollectionTime() {
         CreateArticleRequest request = request();
-        Source source = source(7L, "Energy Storage News");
+        Source source = createSource();
         when(sourceRepository.findById(request.sourceId())).thenReturn(Optional.of(source));
         when(articleRepository.existsByUrl(request.url())).thenReturn(false);
         when(articleRepository.saveAndFlush(any(Article.class))).thenAnswer(invocation -> {
@@ -97,7 +203,7 @@ class ArticleServiceTest {
         });
         Instant beforeCreate = Instant.now();
 
-        ArticleResponse response = articleService.create(request);
+        CreateArticleResponse response = articleService.create(request);
 
         Instant afterCreate = Instant.now();
         ArgumentCaptor<Article> articleCaptor = ArgumentCaptor.forClass(Article.class);
@@ -111,6 +217,7 @@ class ArticleServiceTest {
         assertThat(response.description()).isEqualTo(request.description());
         assertThat(response.content()).isEqualTo(request.content());
         assertThat(response.publishedAt()).isEqualTo(request.publishedAt());
+        verifyNoInteractions(articleTranslationRepository);
     }
 
     @Test
@@ -153,10 +260,39 @@ class ArticleServiceTest {
         );
     }
 
-    private static Source source(Long id, String name) {
+    private static Article article(SourceLanguage language) {
+        Article article = new Article(
+                "Stored article",
+                "https://example.com/articles/stored",
+                source(language),
+                Instant.parse("2026-08-19T06:00:00Z")
+        );
+        article.setDescription("Original summary");
+        article.setContent("Original content");
+        article.setPublishedAt(Instant.parse("2026-08-18T12:00:00Z"));
+        article.onCreate();
+        ReflectionTestUtils.setField(article, "id", 1L);
+        return article;
+    }
+
+    private static Source source(SourceLanguage language) {
         Source source = mock(Source.class);
-        when(source.getId()).thenReturn(id);
-        when(source.getName()).thenReturn(name);
+        when(source.getId()).thenReturn(7L);
+        when(source.getName()).thenReturn("Energy Storage News");
+        when(source.getLanguage()).thenReturn(language);
         return source;
+    }
+
+    private static Source createSource() {
+        Source source = mock(Source.class);
+        when(source.getId()).thenReturn(7L);
+        when(source.getName()).thenReturn("Energy Storage News");
+        return source;
+    }
+
+    private static ArticleTranslation translation(Article article, TranslationStatus status) {
+        ArticleTranslation translation = new ArticleTranslation(article, TranslationLanguage.ZH_CN);
+        translation.setStatus(status);
+        return translation;
     }
 }

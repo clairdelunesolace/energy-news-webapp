@@ -2,14 +2,16 @@ package com.carya.energynews.article;
 
 import java.time.Instant;
 
-public record ArticleResponse(
+public record CreateArticleResponse(
         Long id,
-        ArticleSourceResponse source,
+        String title,
         String url,
+        String description,
+        String content,
         Instant publishedAt,
         Instant collectedAt,
-        ArticleOriginalResponse original,
-        ArticleTranslationResponse translation,
+        Long sourceId,
+        String sourceName,
         Instant createdAt,
         Instant updatedAt
 ) {
