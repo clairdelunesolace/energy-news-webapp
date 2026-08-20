@@ -36,14 +36,15 @@ class NewsSyncControllerTest {
 
     @Test
     void syncsAllEnabledSources() throws Exception {
-        NewsSyncResult result = new NewsSyncResult(5, 3, 2, 1);
+        NewsSyncResult result = new NewsSyncResult(5, 1, 2, 2, 1);
         when(newsSyncService.syncAllEnabledSources()).thenReturn(result);
 
         mockMvc.perform(post("/api/news-sync"))
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.collected").value(5))
-                .andExpect(jsonPath("$.saved").value(3))
+                .andExpect(jsonPath("$.filteredOut").value(1))
+                .andExpect(jsonPath("$.saved").value(2))
                 .andExpect(jsonPath("$.duplicates").value(2))
                 .andExpect(jsonPath("$.failedSources").value(1));
 
@@ -53,7 +54,7 @@ class NewsSyncControllerTest {
     @Test
     void syncsOneSource() throws Exception {
         Source source = source();
-        NewsSyncResult result = new NewsSyncResult(2, 2, 0, 0);
+        NewsSyncResult result = new NewsSyncResult(2, 1, 1, 0, 0);
         when(sourceRepository.findById(7L)).thenReturn(Optional.of(source));
         when(newsSyncService.sync(source)).thenReturn(result);
 
@@ -61,7 +62,8 @@ class NewsSyncControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.collected").value(2))
-                .andExpect(jsonPath("$.saved").value(2))
+                .andExpect(jsonPath("$.filteredOut").value(1))
+                .andExpect(jsonPath("$.saved").value(1))
                 .andExpect(jsonPath("$.duplicates").value(0))
                 .andExpect(jsonPath("$.failedSources").value(0));
 

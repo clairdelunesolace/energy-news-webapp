@@ -14,11 +14,26 @@ app:
     cron: "0 0 2 * * *"
     zone: "Asia/Shanghai"
   news-filter:
-    keywords:
+    threshold: 3
+    strong-keywords:
       - energy storage
       - battery storage
+      - battery energy storage
       - BESS
-      - grid storage
-      - LFP
-      - sodium-ion
+      - grid battery
+      - grid-battery
+      - grid-scale battery
+      - home battery
+      - long-duration energy storage
+      - LDES
+      - thermal energy storage
       - flow battery
+      - sodium-ion battery
+    weak-keywords:
+      - battery
+      - LFP
+      - lithium-ion
+      - virtual power plant
+      - VPP
+      - PCS
+      - power conversion

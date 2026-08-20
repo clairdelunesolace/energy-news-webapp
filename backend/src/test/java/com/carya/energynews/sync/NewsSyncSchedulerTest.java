@@ -34,7 +34,7 @@ class NewsSyncSchedulerTest {
     @Test
     void delegatesScheduledSynchronizationToNewsSyncService() {
         when(newsSyncService.syncAllEnabledSources())
-                .thenReturn(new NewsSyncResult(5, 3, 2, 1));
+                .thenReturn(new NewsSyncResult(5, 1, 2, 2, 1));
 
         newsSyncScheduler.runScheduledSync();
 

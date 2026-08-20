@@ -21,8 +21,9 @@ public class NewsSyncScheduler {
         try {
             NewsSyncResult result = newsSyncService.syncAllEnabledSources();
             LOGGER.info(
-                    "Scheduled news synchronization completed: collected={}, saved={}, duplicates={}, failedSources={}",
+                    "Scheduled news synchronization completed: collected={}, filteredOut={}, saved={}, duplicates={}, failedSources={}",
                     result.collected(),
+                    result.filteredOut(),
                     result.saved(),
                     result.duplicates(),
                     result.failedSources()

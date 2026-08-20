@@ -5,6 +5,8 @@ import com.carya.energynews.article.ArticleIngestionService;
 import com.carya.energynews.collection.CollectedArticle;
 import com.carya.energynews.collection.NewsCollectionException;
 import com.carya.energynews.collection.NewsCollectionService;
+import com.carya.energynews.filter.ArticleFilter;
+import com.carya.energynews.filter.FilterResult;
 import com.carya.energynews.source.Source;
 import com.carya.energynews.source.SourcePriority;
 import com.carya.energynews.source.SourceRepository;
@@ -32,74 +34,98 @@ class NewsSyncServiceTest {
     private NewsCollectionService newsCollectionService;
 
     @Mock
+    private ArticleFilter articleFilter;
+
+    @Mock
     private ArticleIngestionService articleIngestionService;
 
     @InjectMocks
     private NewsSyncService newsSyncService;
 
     @Test
-    void syncsOneSourceAndCountsSavedArticles() {
+    void acceptedArticleReachesIngestion() {
         Source source = source("RSS source", SourceType.RSS);
-        List<CollectedArticle> articles = List.of(
-                article("First article"),
-                article("Second article")
-        );
-        when(newsCollectionService.collect(source)).thenReturn(articles);
-        when(articleIngestionService.ingestAll(articles)).thenReturn(List.of(
-                ArticleIngestionResult.SAVED,
+        CollectedArticle article = article("Accepted article");
+        when(newsCollectionService.collect(source)).thenReturn(List.of(article));
+        when(articleFilter.evaluate(article)).thenReturn(accepted());
+        when(articleIngestionService.ingestAll(List.of(article))).thenReturn(List.of(
                 ArticleIngestionResult.SAVED
         ));
 
         NewsSyncResult result = newsSyncService.sync(source);
 
-        assertThat(result).isEqualTo(new NewsSyncResult(2, 2, 0, 0));
-        verify(newsCollectionService).collect(source);
-        verify(articleIngestionService).ingestAll(articles);
+        assertThat(result).isEqualTo(new NewsSyncResult(1, 0, 1, 0, 0));
+        verify(articleFilter).evaluate(article);
+        verify(articleIngestionService).ingestAll(List.of(article));
     }
 
     @Test
-    void countsDuplicateArticles() {
+    void rejectedArticleDoesNotReachIngestion() {
         Source source = source("RSS source", SourceType.RSS);
-        List<CollectedArticle> articles = List.of(
-                article("New article"),
-                article("First duplicate"),
-                article("Second duplicate")
+        CollectedArticle article = article("Rejected article");
+        when(newsCollectionService.collect(source)).thenReturn(List.of(article));
+        when(articleFilter.evaluate(article)).thenReturn(rejected());
+        when(articleIngestionService.ingestAll(List.of())).thenReturn(List.of());
+
+        NewsSyncResult result = newsSyncService.sync(source);
+
+        assertThat(result).isEqualTo(new NewsSyncResult(1, 1, 0, 0, 0));
+        verify(articleFilter).evaluate(article);
+        verify(articleIngestionService).ingestAll(List.of());
+    }
+
+    @Test
+    void filtersMixedArticlesAndStillCountsDuplicates() {
+        Source source = source("RSS source", SourceType.RSS);
+        CollectedArticle savedArticle = article("Saved article");
+        CollectedArticle rejectedArticle = article("Rejected article");
+        CollectedArticle duplicateArticle = article("Duplicate article");
+        List<CollectedArticle> collectedArticles = List.of(
+                savedArticle,
+                rejectedArticle,
+                duplicateArticle
         );
-        when(newsCollectionService.collect(source)).thenReturn(articles);
-        when(articleIngestionService.ingestAll(articles)).thenReturn(List.of(
+        List<CollectedArticle> acceptedArticles = List.of(savedArticle, duplicateArticle);
+        when(newsCollectionService.collect(source)).thenReturn(collectedArticles);
+        when(articleFilter.evaluate(savedArticle)).thenReturn(accepted());
+        when(articleFilter.evaluate(rejectedArticle)).thenReturn(rejected());
+        when(articleFilter.evaluate(duplicateArticle)).thenReturn(accepted());
+        when(articleIngestionService.ingestAll(acceptedArticles)).thenReturn(List.of(
                 ArticleIngestionResult.SAVED,
-                ArticleIngestionResult.DUPLICATE,
                 ArticleIngestionResult.DUPLICATE
         ));
 
         NewsSyncResult result = newsSyncService.sync(source);
 
-        assertThat(result).isEqualTo(new NewsSyncResult(3, 1, 2, 0));
+        assertThat(result).isEqualTo(new NewsSyncResult(3, 1, 1, 1, 0));
+        verify(articleIngestionService).ingestAll(acceptedArticles);
     }
 
     @Test
     void processesMultipleEnabledRssSourcesAndAggregatesCounts() {
         Source firstSource = source("First RSS source", SourceType.RSS);
         Source secondSource = source("Second RSS source", SourceType.RSS);
-        List<CollectedArticle> firstArticles = List.of(
-                article("First saved article"),
-                article("Duplicate article")
-        );
-        List<CollectedArticle> secondArticles = List.of(article("Second saved article"));
+        CollectedArticle firstAcceptedArticle = article("First accepted article");
+        CollectedArticle filteredArticle = article("Filtered article");
+        CollectedArticle secondAcceptedArticle = article("Second accepted article");
+        List<CollectedArticle> firstArticles = List.of(firstAcceptedArticle, filteredArticle);
+        List<CollectedArticle> secondArticles = List.of(secondAcceptedArticle);
         when(sourceRepository.findAllByEnabledTrue()).thenReturn(List.of(firstSource, secondSource));
         when(newsCollectionService.collect(firstSource)).thenReturn(firstArticles);
         when(newsCollectionService.collect(secondSource)).thenReturn(secondArticles);
-        when(articleIngestionService.ingestAll(firstArticles)).thenReturn(List.of(
-                ArticleIngestionResult.SAVED,
-                ArticleIngestionResult.DUPLICATE
+        when(articleFilter.evaluate(firstAcceptedArticle)).thenReturn(accepted());
+        when(articleFilter.evaluate(filteredArticle)).thenReturn(rejected());
+        when(articleFilter.evaluate(secondAcceptedArticle)).thenReturn(accepted());
+        when(articleIngestionService.ingestAll(List.of(firstAcceptedArticle))).thenReturn(List.of(
+                ArticleIngestionResult.SAVED
         ));
-        when(articleIngestionService.ingestAll(secondArticles)).thenReturn(List.of(
+        when(articleIngestionService.ingestAll(List.of(secondAcceptedArticle))).thenReturn(List.of(
                 ArticleIngestionResult.SAVED
         ));
 
         NewsSyncResult result = newsSyncService.syncAllEnabledSources();
 
-        assertThat(result).isEqualTo(new NewsSyncResult(3, 2, 1, 0));
+        assertThat(result).isEqualTo(new NewsSyncResult(3, 1, 2, 0, 0));
         verify(newsCollectionService).collect(firstSource);
         verify(newsCollectionService).collect(secondSource);
     }
@@ -108,21 +134,22 @@ class NewsSyncServiceTest {
     void continuesAfterOneSourceFailsCollection() {
         Source failingSource = source("Failing RSS source", SourceType.RSS);
         Source healthySource = source("Healthy RSS source", SourceType.RSS);
-        List<CollectedArticle> healthyArticles = List.of(article("Healthy article"));
+        CollectedArticle healthyArticle = article("Healthy article");
         when(sourceRepository.findAllByEnabledTrue()).thenReturn(List.of(failingSource, healthySource));
         when(newsCollectionService.collect(failingSource))
                 .thenThrow(new NewsCollectionException("Unable to fetch RSS feed"));
-        when(newsCollectionService.collect(healthySource)).thenReturn(healthyArticles);
-        when(articleIngestionService.ingestAll(healthyArticles)).thenReturn(List.of(
+        when(newsCollectionService.collect(healthySource)).thenReturn(List.of(healthyArticle));
+        when(articleFilter.evaluate(healthyArticle)).thenReturn(accepted());
+        when(articleIngestionService.ingestAll(List.of(healthyArticle))).thenReturn(List.of(
                 ArticleIngestionResult.SAVED
         ));
 
         NewsSyncResult result = newsSyncService.syncAllEnabledSources();
 
-        assertThat(result).isEqualTo(new NewsSyncResult(1, 1, 0, 1));
+        assertThat(result).isEqualTo(new NewsSyncResult(1, 0, 1, 0, 1));
         verify(newsCollectionService).collect(failingSource);
         verify(newsCollectionService).collect(healthySource);
-        verify(articleIngestionService).ingestAll(healthyArticles);
+        verify(articleIngestionService).ingestAll(List.of(healthyArticle));
     }
 
     @Test
@@ -133,7 +160,7 @@ class NewsSyncServiceTest {
 
         NewsSyncResult result = newsSyncService.sync(source);
 
-        assertThat(result).isEqualTo(new NewsSyncResult(0, 0, 0, 0));
+        assertThat(result).isEqualTo(new NewsSyncResult(0, 0, 0, 0, 0));
         verify(articleIngestionService).ingestAll(List.of());
     }
 
@@ -152,7 +179,7 @@ class NewsSyncServiceTest {
 
         NewsSyncResult result = newsSyncService.syncAllEnabledSources();
 
-        assertThat(result).isEqualTo(new NewsSyncResult(0, 0, 0, 0));
+        assertThat(result).isEqualTo(new NewsSyncResult(0, 0, 0, 0, 0));
         verify(newsCollectionService).collect(rssSource);
         verify(newsCollectionService, never()).collect(apiSource);
         verify(newsCollectionService, never()).collect(websiteSource);
@@ -176,5 +203,13 @@ class NewsSyncServiceTest {
                 null,
                 null
         );
+    }
+
+    private FilterResult accepted() {
+        return new FilterResult(true, "Matched keyword");
+    }
+
+    private FilterResult rejected() {
+        return new FilterResult(false, "No configured keyword matched");
     }
 }
