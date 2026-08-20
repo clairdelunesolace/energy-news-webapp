@@ -12,6 +12,7 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import jakarta.validation.constraints.NotNull;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.time.Instant;
 
@@ -40,6 +41,12 @@ public class Source {
     @Enumerated(EnumType.STRING)
     private SourcePriority priority;
 
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @ColumnDefault("'EN'")
+    private SourceLanguage language = SourceLanguage.EN;
+
     @Column(nullable = false)
     private boolean enabled = true;
 
@@ -53,10 +60,21 @@ public class Source {
     }
 
     public Source(String name, String url, SourceType type, SourcePriority priority) {
+        this(name, url, type, priority, SourceLanguage.EN);
+    }
+
+    public Source(
+            String name,
+            String url,
+            SourceType type,
+            SourcePriority priority,
+            SourceLanguage language
+    ) {
         this.name = name;
         this.url = url;
         this.type = type;
         this.priority = priority;
+        this.language = language == null ? SourceLanguage.EN : language;
     }
 
     @PrePersist
@@ -105,6 +123,10 @@ public class Source {
 
     public void setPriority(SourcePriority priority) {
         this.priority = priority;
+    }
+
+    public SourceLanguage getLanguage() {
+        return language;
     }
 
     public boolean isEnabled() {

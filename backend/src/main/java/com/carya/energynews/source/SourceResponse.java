@@ -8,6 +8,7 @@ public record SourceResponse(
         String url,
         SourceType type,
         SourcePriority priority,
+        SourceLanguage language,
         boolean enabled,
         Instant createdAt,
         Instant updatedAt

@@ -31,7 +31,13 @@ public class SourceService {
             throw new DuplicateSourceUrlException(request.url());
         }
 
-        Source source = new Source(request.name(), request.url(), request.type(), request.priority());
+        Source source = new Source(
+                request.name(),
+                request.url(),
+                request.type(),
+                request.priority(),
+                request.language()
+        );
 
         try {
             return toResponse(sourceRepository.saveAndFlush(source));
@@ -47,6 +53,7 @@ public class SourceService {
                 source.getUrl(),
                 source.getType(),
                 source.getPriority(),
+                source.getLanguage(),
                 source.isEnabled(),
                 source.getCreatedAt(),
                 source.getUpdatedAt()

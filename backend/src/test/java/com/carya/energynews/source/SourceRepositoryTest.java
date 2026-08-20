@@ -2,6 +2,8 @@ package com.carya.energynews.source;
 
 import jakarta.validation.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -34,6 +36,7 @@ class SourceRepositoryTest {
 
         assertThat(saved.getId()).isNotNull();
         assertThat(saved.isEnabled()).isTrue();
+        assertThat(saved.getLanguage()).isEqualTo(SourceLanguage.EN);
         assertThat(saved.getCreatedAt()).isNotNull();
         assertThat(saved.getUpdatedAt()).isEqualTo(saved.getCreatedAt());
         assertThat(jdbcTemplate.queryForObject(
@@ -46,6 +49,32 @@ class SourceRepositoryTest {
                 String.class,
                 saved.getId()
         )).isEqualTo("HIGH");
+        assertThat(jdbcTemplate.queryForObject(
+                "select language from sources where id = ?",
+                String.class,
+                saved.getId()
+        )).isEqualTo("EN");
+    }
+
+    @ParameterizedTest
+    @EnumSource(SourceLanguage.class)
+    void preservesExplicitLanguage(SourceLanguage language) {
+        Source source = new Source(
+                "Explicit language source",
+                "https://example.com/" + language.name().toLowerCase(),
+                SourceType.RSS,
+                SourcePriority.MEDIUM,
+                language
+        );
+
+        Source saved = sourceRepository.saveAndFlush(source);
+
+        assertThat(saved.getLanguage()).isEqualTo(language);
+        assertThat(jdbcTemplate.queryForObject(
+                "select language from sources where id = ?",
+                String.class,
+                saved.getId()
+        )).isEqualTo(language.name());
     }
 
     @Test

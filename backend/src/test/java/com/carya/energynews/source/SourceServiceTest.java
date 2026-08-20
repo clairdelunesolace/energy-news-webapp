@@ -2,6 +2,8 @@ package com.carya.energynews.source;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -45,6 +47,7 @@ class SourceServiceTest {
                 "https://example.com/feed",
                 SourceType.RSS,
                 SourcePriority.HIGH,
+                SourceLanguage.EN,
                 true,
                 source.getCreatedAt(),
                 source.getUpdatedAt()
@@ -80,9 +83,36 @@ class SourceServiceTest {
         ArgumentCaptor<Source> sourceCaptor = ArgumentCaptor.forClass(Source.class);
         verify(sourceRepository).saveAndFlush(sourceCaptor.capture());
         assertThat(sourceCaptor.getValue().isEnabled()).isTrue();
+        assertThat(sourceCaptor.getValue().getLanguage()).isEqualTo(SourceLanguage.EN);
         assertThat(response.enabled()).isTrue();
+        assertThat(response.language()).isEqualTo(SourceLanguage.EN);
         assertThat(response.name()).isEqualTo(request.name());
         assertThat(response.url()).isEqualTo(request.url());
+    }
+
+    @ParameterizedTest
+    @EnumSource(SourceLanguage.class)
+    void createsSourceWithExplicitLanguage(SourceLanguage language) {
+        CreateSourceRequest request = new CreateSourceRequest(
+                "Language source",
+                "https://example.com/" + language.name().toLowerCase(),
+                SourceType.RSS,
+                SourcePriority.MEDIUM,
+                language
+        );
+        when(sourceRepository.existsByUrl(request.url())).thenReturn(false);
+        when(sourceRepository.saveAndFlush(any(Source.class))).thenAnswer(invocation -> {
+            Source source = invocation.getArgument(0);
+            source.onCreate();
+            return source;
+        });
+
+        SourceResponse response = sourceService.create(request);
+
+        ArgumentCaptor<Source> sourceCaptor = ArgumentCaptor.forClass(Source.class);
+        verify(sourceRepository).saveAndFlush(sourceCaptor.capture());
+        assertThat(sourceCaptor.getValue().getLanguage()).isEqualTo(language);
+        assertThat(response.language()).isEqualTo(language);
     }
 
     @Test

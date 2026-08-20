@@ -43,6 +43,7 @@ class SourceControllerTest {
                 .andExpect(jsonPath("$[0].name").value("Energy Storage News"))
                 .andExpect(jsonPath("$[0].type").value("RSS"))
                 .andExpect(jsonPath("$[0].priority").value("HIGH"))
+                .andExpect(jsonPath("$[0].language").value("EN"))
                 .andExpect(jsonPath("$[0].enabled").value(true));
     }
 
@@ -53,6 +54,7 @@ class SourceControllerTest {
         mockMvc.perform(get("/api/sources/1"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.language").value("EN"))
                 .andExpect(jsonPath("$.url").value("https://example.com/feed"));
     }
 
@@ -89,8 +91,37 @@ class SourceControllerTest {
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.language").value("EN"))
                 .andExpect(jsonPath("$.enabled").value(true))
                 .andExpect(jsonPath("$.createdAt").value("2026-08-19T01:00:00Z"));
+
+        verify(sourceService).create(request);
+    }
+
+    @Test
+    void createsSourceWithExplicitChineseLanguage() throws Exception {
+        CreateSourceRequest request = new CreateSourceRequest(
+                "Example Chinese Source",
+                "https://example.cn/feed",
+                SourceType.RSS,
+                SourcePriority.MEDIUM,
+                SourceLanguage.ZH_CN
+        );
+        when(sourceService.create(request)).thenReturn(sourceResponse(SourceLanguage.ZH_CN));
+
+        mockMvc.perform(post("/api/sources")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "Example Chinese Source",
+                                  "url": "https://example.cn/feed",
+                                  "type": "RSS",
+                                  "priority": "MEDIUM",
+                                  "language": "ZH_CN"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.language").value("ZH_CN"));
 
         verify(sourceService).create(request);
     }
@@ -141,12 +172,17 @@ class SourceControllerTest {
     }
 
     private static SourceResponse sourceResponse() {
+        return sourceResponse(SourceLanguage.EN);
+    }
+
+    private static SourceResponse sourceResponse(SourceLanguage language) {
         return new SourceResponse(
                 1L,
                 "Energy Storage News",
                 "https://example.com/feed",
                 SourceType.RSS,
                 SourcePriority.HIGH,
+                language,
                 true,
                 CREATED_AT,
                 UPDATED_AT
