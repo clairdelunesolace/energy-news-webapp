@@ -18,6 +18,7 @@ export interface ArticleTranslationResponse {
   language: TranslationLanguage
   title: string | null
   description: string | null
+  content: string | null
 }
 
 export interface ArticleResponse {

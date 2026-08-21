@@ -63,6 +63,7 @@ function ArticleDetail({ article }: { article: ArticleResponse }) {
     article.original.language === 'EN' && article.translation !== null
   const translatedTitle = article.translation?.title?.trim() || null
   const translatedDescription = article.translation?.description?.trim() || null
+  const translatedContent = article.translation?.content?.trim() || null
   const originalDescription = article.original.description?.trim() || null
   const originalContent = article.original.content?.trim() || null
   const primaryTitle =
@@ -70,10 +71,12 @@ function ArticleDetail({ article }: { article: ArticleResponse }) {
   const primaryDescription = hasChineseTranslation
     ? translatedDescription
     : originalDescription
+  const primaryContent = hasChineseTranslation ? translatedContent : originalContent
   const originalLanguage = article.original.language === 'ZH_CN' ? 'zh-CN' : 'en'
   const primaryTitleLanguage =
     hasChineseTranslation && translatedTitle ? 'zh-CN' : originalLanguage
   const primaryDescriptionLanguage = hasChineseTranslation ? 'zh-CN' : originalLanguage
+  const primaryContentLanguage = hasChineseTranslation ? 'zh-CN' : originalLanguage
   const timestamp = article.publishedAt ?? article.collectedAt
 
   return (
@@ -86,15 +89,6 @@ function ArticleDetail({ article }: { article: ArticleResponse }) {
         </div>
 
         <h1 lang={primaryTitleLanguage}>{primaryTitle}</h1>
-
-        <a
-          className="article-detail__external-link"
-          href={article.url}
-          target="_blank"
-          rel="noreferrer"
-        >
-          查看原文 ↗
-        </a>
       </header>
 
       {primaryDescription && (
@@ -104,16 +98,49 @@ function ArticleDetail({ article }: { article: ArticleResponse }) {
         </section>
       )}
 
+      {primaryContent && (
+        <section className="article-detail__body" aria-label="文章正文">
+          <ArticleParagraphs content={primaryContent} language={primaryContentLanguage} />
+        </section>
+      )}
+
+      <a
+        className="article-detail__external-link"
+        href={article.url}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        查看原文 ↗
+      </a>
+
       {hasChineseTranslation && (
         <details className="article-detail__original">
           <summary>查看英文原文</summary>
           <div className="article-detail__original-content" lang="en">
             <h2>{article.original.title}</h2>
             {originalDescription && <p>{originalDescription}</p>}
-            {originalContent && <p className="article-detail__full-content">{originalContent}</p>}
+            {originalContent && (
+              <ArticleParagraphs content={originalContent} language="en" />
+            )}
           </div>
         </details>
       )}
     </article>
+  )
+}
+
+function ArticleParagraphs({ content, language }: { content: string; language: string }) {
+  const paragraphs = content
+    .replace(/\r\n?/g, '\n')
+    .split(/\n[ \t]*\n+/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean)
+
+  return (
+    <div className="article-detail__paragraphs" lang={language}>
+      {paragraphs.map((paragraph, index) => (
+        <p key={index}>{paragraph}</p>
+      ))}
+    </div>
   )
 }
