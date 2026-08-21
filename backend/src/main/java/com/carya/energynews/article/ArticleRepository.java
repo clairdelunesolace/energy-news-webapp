@@ -76,4 +76,16 @@ public interface ArticleRepository extends JpaRepository<Article, Long> {
             @Param("successfulStatus") TranslationStatus successfulStatus,
             Pageable pageable
     );
+
+    @Query("""
+            SELECT article
+            FROM Article article
+            WHERE article.content IS NULL OR TRIM(article.content) = ''
+            ORDER BY
+                CASE WHEN article.publishedAt IS NULL THEN 1 ELSE 0 END,
+                article.publishedAt DESC,
+                article.collectedAt DESC,
+                article.id DESC
+            """)
+    List<Article> findContentBackfillCandidates(Pageable pageable);
 }
