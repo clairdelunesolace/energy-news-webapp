@@ -13,6 +13,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 
@@ -30,17 +31,50 @@ public class WebArticleContentFetcher implements ArticleContentFetcher {
     private static final int MIN_CONTENT_LENGTH = 200;
     private static final String UNWANTED_ELEMENTS = """
             script, style, noscript, nav, footer, aside, form,
-            [role=navigation], [role=contentinfo],
+            [role=navigation], [role=contentinfo], [role=complementary],
             .cookie-banner, .cookie-consent, .related-articles, .newsletter, .advertisement
             """;
+    private static final List<String> UNWANTED_STRUCTURAL_MARKERS = List.of(
+            "newsletter",
+            "signup",
+            "subscribe",
+            "subscription",
+            "cookie",
+            "consent",
+            "author-bio",
+            "author-biography",
+            "author-profile",
+            "author-box",
+            "author-card",
+            "contributor-bio",
+            "bio",
+            "tags",
+            "taxonomy",
+            "categories",
+            "category-list",
+            "related",
+            "share",
+            "sharing",
+            "promo",
+            "promotion",
+            "promotional",
+            "advertisement",
+            "advertising"
+    );
     private static final List<String> BODY_SELECTORS = List.of(
             "[itemprop=articleBody]",
+            "[data-testid=article-body]",
+            "[data-component=article-body]",
+            "[data-role=article-body]",
             ".article-body",
             ".article__body",
+            ".article__content",
             ".article-content",
             ".entry-content",
+            ".post-body",
             ".post-content",
             ".story-body",
+            ".story__body",
             "article",
             "main"
     );
@@ -122,7 +156,7 @@ public class WebArticleContentFetcher implements ArticleContentFetcher {
             throw new ArticleContentFetchException("Unable to parse article HTML", exception);
         }
 
-        document.select(UNWANTED_ELEMENTS).remove();
+        removeUnwantedElements(document);
         for (String selector : BODY_SELECTORS) {
             for (Element container : document.select(selector)) {
                 List<String> paragraphs = extractParagraphs(container);
@@ -135,13 +169,55 @@ public class WebArticleContentFetcher implements ArticleContentFetcher {
         throw new ArticleContentFetchException("No usable article content was found");
     }
 
+    private void removeUnwantedElements(Element root) {
+        root.select(UNWANTED_ELEMENTS).remove();
+        root.getAllElements().stream()
+                .filter(this::hasUnwantedStructuralMarker)
+                .toList()
+                .forEach(Element::remove);
+    }
+
+    private boolean hasUnwantedStructuralMarker(Element element) {
+        return List.of(
+                        element.id(),
+                        element.className(),
+                        element.attr("role"),
+                        element.attr("aria-label")
+                ).stream()
+                .map(this::normalizeStructuralValue)
+                .anyMatch(value -> UNWANTED_STRUCTURAL_MARKERS.stream()
+                        .anyMatch(marker -> value.contains("-" + marker + "-")));
+    }
+
+    private String normalizeStructuralValue(String value) {
+        return "-" + value.replaceAll("([a-z0-9])([A-Z])", "$1-$2")
+                .toLowerCase(Locale.ROOT)
+                .replaceAll("[^a-z0-9]+", "-") + "-";
+    }
+
     private List<String> extractParagraphs(Element container) {
-        return container.select("p").stream()
-                .map(Element::text)
-                .map(String::trim)
-                .filter(text -> !text.isBlank())
-                .distinct()
-                .toList();
+        LinkedHashSet<String> paragraphs = new LinkedHashSet<>();
+        for (Element element : container.getAllElements()) {
+            if (isTrailingBoundary(element)) {
+                break;
+            }
+            if (!element.tagName().equals("p")) {
+                continue;
+            }
+
+            String text = element.text().trim();
+            if (!text.isBlank()) {
+                paragraphs.add(text);
+            }
+        }
+        return List.copyOf(paragraphs);
+    }
+
+    private boolean isTrailingBoundary(Element element) {
+        return element.hasClass("article-form")
+                && element.selectFirst(
+                        "[data-consent-placeholder], [data-consent-category]"
+                ) != null;
     }
 
     private boolean isUsable(List<String> paragraphs) {

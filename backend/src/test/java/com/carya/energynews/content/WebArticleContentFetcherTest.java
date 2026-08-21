@@ -96,6 +96,50 @@ class WebArticleContentFetcherTest {
     }
 
     @Test
+    void excludesTrailingPublisherChromeFromArticleBody() throws IOException {
+        serve(200, fixture("canary-trailing-chrome.html"));
+
+        String content = fetcher.fetchContent(article(url("/article")));
+
+        assertThat(content)
+                .isEqualTo(
+                        "LG Energy Solution opened its Michigan battery cell factory after "
+                                + "converting part of the facility to serve fast-growing grid "
+                                + "energy-storage demand.\n\n"
+                                + "Company leaders said the plant will strengthen domestic supply "
+                                + "chains, support skilled manufacturing jobs, and supply lithium "
+                                + "iron phosphate cells to storage projects across North America.\n\n"
+                                + "The factory is expected to reach full production next year as "
+                                + "utilities and developers add batteries to meet rising electricity "
+                                + "demand and balance renewable generation."
+                )
+                .doesNotContain(
+                        "signup form",
+                        "cookie consent",
+                        "newsletter subscription",
+                        "freelance reporter",
+                        "Geothermal",
+                        "Clean energy manufacturing",
+                        "Politics"
+                );
+    }
+
+    @Test
+    void keepsLegitimateParagraphsThatMentionStructuralCleanupTerms() {
+        String firstParagraph = "The policy analysis discusses politics and public consent while "
+                + "explaining why the proposed battery project remains important for local grid "
+                + "reliability and long-term energy planning.";
+        String secondParagraph = "The utility also described subscription options and browser "
+                + "cookies in its customer portal without changing the technical design, operating "
+                + "schedule, or expected performance of the storage facility.";
+        serve(200, "<html><article><p>" + firstParagraph + "</p><p>"
+                + secondParagraph + "</p></article></html>");
+
+        assertThat(fetcher.fetchContent(article(url("/article"))))
+                .isEqualTo(firstParagraph + "\n\n" + secondParagraph);
+    }
+
+    @Test
     void rejectsATinyArticleCandidate() {
         serve(200, """
                 <html><article>
