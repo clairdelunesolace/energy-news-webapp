@@ -1,15 +1,20 @@
 package com.carya.energynews.sync;
 
+import com.carya.energynews.article.Article;
 import com.carya.energynews.article.ArticleIngestionResult;
 import com.carya.energynews.article.ArticleIngestionService;
 import com.carya.energynews.collection.CollectedArticle;
 import com.carya.energynews.collection.NewsCollectionException;
 import com.carya.energynews.collection.NewsCollectionService;
+import com.carya.energynews.content.ArticleContentFetchException;
+import com.carya.energynews.content.ArticleContentService;
 import com.carya.energynews.filter.ArticleFilter;
 import com.carya.energynews.source.Source;
 import com.carya.energynews.source.SourceLanguage;
 import com.carya.energynews.source.SourceRepository;
 import com.carya.energynews.source.SourceType;
+import com.carya.energynews.translation.ArticleContentTranslationService;
+import com.carya.energynews.translation.ContentTranslationStatus;
 import com.carya.energynews.translation.TranslationException;
 import com.carya.energynews.translation.TranslationLanguage;
 import com.carya.energynews.translation.TranslationService;
@@ -27,19 +32,25 @@ public class NewsSyncService {
     private final ArticleFilter articleFilter;
     private final ArticleIngestionService articleIngestionService;
     private final TranslationService translationService;
+    private final ArticleContentService articleContentService;
+    private final ArticleContentTranslationService articleContentTranslationService;
 
     public NewsSyncService(
             SourceRepository sourceRepository,
             NewsCollectionService newsCollectionService,
             ArticleFilter articleFilter,
             ArticleIngestionService articleIngestionService,
-            TranslationService translationService
+            TranslationService translationService,
+            ArticleContentService articleContentService,
+            ArticleContentTranslationService articleContentTranslationService
     ) {
         this.sourceRepository = sourceRepository;
         this.newsCollectionService = newsCollectionService;
         this.articleFilter = articleFilter;
         this.articleIngestionService = articleIngestionService;
         this.translationService = translationService;
+        this.articleContentService = articleContentService;
+        this.articleContentTranslationService = articleContentTranslationService;
     }
 
     public NewsSyncResult sync(Source source) {
@@ -64,6 +75,10 @@ public class NewsSyncService {
         int duplicates = 0;
         int translated = 0;
         int translationFailed = 0;
+        int contentFetched = 0;
+        int contentFetchFailed = 0;
+        int contentTranslated = 0;
+        int contentTranslationFailed = 0;
         int failedSources = 0;
 
         for (Source source : sourceRepository.findAllByEnabledTrue()) {
@@ -79,6 +94,10 @@ public class NewsSyncService {
                 duplicates += sourceResult.duplicates();
                 translated += sourceResult.translated();
                 translationFailed += sourceResult.translationFailed();
+                contentFetched += sourceResult.contentFetched();
+                contentFetchFailed += sourceResult.contentFetchFailed();
+                contentTranslated += sourceResult.contentTranslated();
+                contentTranslationFailed += sourceResult.contentTranslationFailed();
             } catch (NewsCollectionException exception) {
                 failedSources++;
             }
@@ -91,6 +110,10 @@ public class NewsSyncService {
                 duplicates,
                 translated,
                 translationFailed,
+                contentFetched,
+                contentFetchFailed,
+                contentTranslated,
+                contentTranslationFailed,
                 failedSources
         );
     }
@@ -105,6 +128,10 @@ public class NewsSyncService {
         int duplicates = 0;
         int translated = 0;
         int translationFailed = 0;
+        int contentFetched = 0;
+        int contentFetchFailed = 0;
+        int contentTranslated = 0;
+        int contentTranslationFailed = 0;
 
         for (ArticleIngestionResult result : ingestionResults) {
             switch (result.status()) {
@@ -112,17 +139,49 @@ public class NewsSyncService {
                 case DUPLICATE -> duplicates++;
             }
 
-            if (result.article().getSource().getLanguage() != SourceLanguage.EN) {
+            Article article = result.article();
+            boolean titleTranslationSuccessful = false;
+
+            if (article.getSource().getLanguage() == SourceLanguage.EN) {
+                try {
+                    if (translationService.translate(article, TranslationLanguage.ZH_CN).getStatus()
+                            == TranslationStatus.SUCCESS) {
+                        translated++;
+                        titleTranslationSuccessful = true;
+                    }
+                } catch (TranslationException exception) {
+                    translationFailed++;
+                }
+            }
+
+            try {
+                article = articleContentService.enrichContent(article);
+            } catch (ArticleContentFetchException exception) {
+                contentFetchFailed++;
+                continue;
+            }
+
+            boolean contentAvailable = article.getContent() != null
+                    && !article.getContent().isBlank();
+            if (contentAvailable) {
+                contentFetched++;
+            }
+
+            if (!titleTranslationSuccessful
+                    || article.getSource().getLanguage() != SourceLanguage.EN
+                    || !contentAvailable) {
                 continue;
             }
 
             try {
-                if (translationService.translate(result.article(), TranslationLanguage.ZH_CN).getStatus()
-                        == TranslationStatus.SUCCESS) {
-                    translated++;
+                if (articleContentTranslationService.translateContent(
+                        article,
+                        TranslationLanguage.ZH_CN
+                ).getContentStatus() == ContentTranslationStatus.SUCCESS) {
+                    contentTranslated++;
                 }
             } catch (TranslationException exception) {
-                translationFailed++;
+                contentTranslationFailed++;
             }
         }
 
@@ -133,6 +192,10 @@ public class NewsSyncService {
                 duplicates,
                 translated,
                 translationFailed,
+                contentFetched,
+                contentFetchFailed,
+                contentTranslated,
+                contentTranslationFailed,
                 failedSources
         );
     }

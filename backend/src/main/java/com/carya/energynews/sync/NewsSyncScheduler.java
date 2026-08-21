@@ -21,13 +21,17 @@ public class NewsSyncScheduler {
         try {
             NewsSyncResult result = newsSyncService.syncAllEnabledSources();
             LOGGER.info(
-                    "Scheduled news synchronization completed: collected={}, filteredOut={}, saved={}, duplicates={}, translated={}, translationFailed={}, failedSources={}",
+                    "Scheduled news synchronization completed: collected={}, filteredOut={}, saved={}, duplicates={}, translated={}, translationFailed={}, contentFetched={}, contentFetchFailed={}, contentTranslated={}, contentTranslationFailed={}, failedSources={}",
                     result.collected(),
                     result.filteredOut(),
                     result.saved(),
                     result.duplicates(),
                     result.translated(),
                     result.translationFailed(),
+                    result.contentFetched(),
+                    result.contentFetchFailed(),
+                    result.contentTranslated(),
+                    result.contentTranslationFailed(),
                     result.failedSources()
             );
         } catch (Exception exception) {

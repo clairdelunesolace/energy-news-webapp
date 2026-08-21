@@ -34,14 +34,17 @@ class NewsSyncSchedulerTest {
     }
 
     @Test
-    void delegatesScheduledSynchronizationAndLogsTranslationCounters(CapturedOutput output) {
+    void delegatesScheduledSynchronizationAndLogsAllStageCounters(CapturedOutput output) {
         when(newsSyncService.syncAllEnabledSources())
-                .thenReturn(new NewsSyncResult(5, 1, 2, 2, 3, 1, 1));
+                .thenReturn(new NewsSyncResult(5, 1, 2, 2, 3, 1, 4, 1, 2, 1, 1));
 
         newsSyncScheduler.runScheduledSync();
 
         verify(newsSyncService).syncAllEnabledSources();
-        assertThat(output).contains("translated=3, translationFailed=1, failedSources=1");
+        assertThat(output).contains(
+                "translated=3, translationFailed=1, contentFetched=4, contentFetchFailed=1, "
+                        + "contentTranslated=2, contentTranslationFailed=1, failedSources=1"
+        );
     }
 
     @Test

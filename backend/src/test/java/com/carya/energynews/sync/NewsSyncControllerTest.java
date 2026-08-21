@@ -36,7 +36,7 @@ class NewsSyncControllerTest {
 
     @Test
     void syncsAllEnabledSources() throws Exception {
-        NewsSyncResult result = new NewsSyncResult(5, 1, 2, 2, 3, 1, 1);
+        NewsSyncResult result = new NewsSyncResult(5, 1, 2, 2, 3, 1, 4, 1, 2, 1, 1);
         when(newsSyncService.syncAllEnabledSources()).thenReturn(result);
 
         mockMvc.perform(post("/api/news-sync"))
@@ -48,6 +48,10 @@ class NewsSyncControllerTest {
                 .andExpect(jsonPath("$.duplicates").value(2))
                 .andExpect(jsonPath("$.translated").value(3))
                 .andExpect(jsonPath("$.translationFailed").value(1))
+                .andExpect(jsonPath("$.contentFetched").value(4))
+                .andExpect(jsonPath("$.contentFetchFailed").value(1))
+                .andExpect(jsonPath("$.contentTranslated").value(2))
+                .andExpect(jsonPath("$.contentTranslationFailed").value(1))
                 .andExpect(jsonPath("$.failedSources").value(1));
 
         verify(newsSyncService).syncAllEnabledSources();
@@ -56,7 +60,7 @@ class NewsSyncControllerTest {
     @Test
     void syncsOneSource() throws Exception {
         Source source = source();
-        NewsSyncResult result = new NewsSyncResult(2, 1, 1, 0, 1, 0, 0);
+        NewsSyncResult result = new NewsSyncResult(2, 1, 1, 0, 1, 0, 1, 0, 1, 0, 0);
         when(sourceRepository.findById(7L)).thenReturn(Optional.of(source));
         when(newsSyncService.sync(source)).thenReturn(result);
 
@@ -69,6 +73,10 @@ class NewsSyncControllerTest {
                 .andExpect(jsonPath("$.duplicates").value(0))
                 .andExpect(jsonPath("$.translated").value(1))
                 .andExpect(jsonPath("$.translationFailed").value(0))
+                .andExpect(jsonPath("$.contentFetched").value(1))
+                .andExpect(jsonPath("$.contentFetchFailed").value(0))
+                .andExpect(jsonPath("$.contentTranslated").value(1))
+                .andExpect(jsonPath("$.contentTranslationFailed").value(0))
                 .andExpect(jsonPath("$.failedSources").value(0));
 
         verify(sourceRepository).findById(7L);
