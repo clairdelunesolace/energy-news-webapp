@@ -36,6 +36,7 @@ class SourceRepositoryTest {
 
         assertThat(saved.getId()).isNotNull();
         assertThat(saved.isEnabled()).isTrue();
+        assertThat(saved.isContentEnrichmentEnabled()).isFalse();
         assertThat(saved.getLanguage()).isEqualTo(SourceLanguage.EN);
         assertThat(saved.getCreatedAt()).isNotNull();
         assertThat(saved.getUpdatedAt()).isEqualTo(saved.getCreatedAt());
@@ -54,6 +55,32 @@ class SourceRepositoryTest {
                 String.class,
                 saved.getId()
         )).isEqualTo("EN");
+        assertThat(jdbcTemplate.queryForObject(
+                "select content_enrichment_enabled from sources where id = ?",
+                Boolean.class,
+                saved.getId()
+        )).isFalse();
+    }
+
+    @Test
+    void persistsExplicitlyEnabledContentEnrichment() {
+        Source source = new Source(
+                "Full-content source",
+                "https://example.com/full-content",
+                SourceType.RSS,
+                SourcePriority.HIGH,
+                SourceLanguage.EN,
+                true
+        );
+
+        Source saved = sourceRepository.saveAndFlush(source);
+
+        assertThat(saved.isContentEnrichmentEnabled()).isTrue();
+        assertThat(jdbcTemplate.queryForObject(
+                "select content_enrichment_enabled from sources where id = ?",
+                Boolean.class,
+                saved.getId()
+        )).isTrue();
     }
 
     @ParameterizedTest

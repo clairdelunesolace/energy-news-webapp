@@ -49,6 +49,7 @@ class SourceServiceTest {
                 SourcePriority.HIGH,
                 SourceLanguage.EN,
                 true,
+                false,
                 source.getCreatedAt(),
                 source.getUpdatedAt()
         ));
@@ -84,10 +85,37 @@ class SourceServiceTest {
         verify(sourceRepository).saveAndFlush(sourceCaptor.capture());
         assertThat(sourceCaptor.getValue().isEnabled()).isTrue();
         assertThat(sourceCaptor.getValue().getLanguage()).isEqualTo(SourceLanguage.EN);
+        assertThat(sourceCaptor.getValue().isContentEnrichmentEnabled()).isFalse();
         assertThat(response.enabled()).isTrue();
         assertThat(response.language()).isEqualTo(SourceLanguage.EN);
+        assertThat(response.contentEnrichmentEnabled()).isFalse();
         assertThat(response.name()).isEqualTo(request.name());
         assertThat(response.url()).isEqualTo(request.url());
+    }
+
+    @Test
+    void createsSourceWithContentEnrichmentEnabled() {
+        CreateSourceRequest request = new CreateSourceRequest(
+                "Qualified full-content source",
+                "https://example.com/qualified-feed",
+                SourceType.RSS,
+                SourcePriority.HIGH,
+                SourceLanguage.EN,
+                true
+        );
+        when(sourceRepository.existsByUrl(request.url())).thenReturn(false);
+        when(sourceRepository.saveAndFlush(any(Source.class))).thenAnswer(invocation -> {
+            Source source = invocation.getArgument(0);
+            source.onCreate();
+            return source;
+        });
+
+        SourceResponse response = sourceService.create(request);
+
+        ArgumentCaptor<Source> sourceCaptor = ArgumentCaptor.forClass(Source.class);
+        verify(sourceRepository).saveAndFlush(sourceCaptor.capture());
+        assertThat(sourceCaptor.getValue().isContentEnrichmentEnabled()).isTrue();
+        assertThat(response.contentEnrichmentEnabled()).isTrue();
     }
 
     @ParameterizedTest

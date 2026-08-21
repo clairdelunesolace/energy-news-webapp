@@ -8,7 +8,8 @@ public record CreateSourceRequest(
         @NotBlank String url,
         @NotNull SourceType type,
         @NotNull SourcePriority priority,
-        SourceLanguage language
+        SourceLanguage language,
+        boolean contentEnrichmentEnabled
 ) {
 
     public CreateSourceRequest(
@@ -17,6 +18,16 @@ public record CreateSourceRequest(
             SourceType type,
             SourcePriority priority
     ) {
-        this(name, url, type, priority, null);
+        this(name, url, type, priority, null, false);
+    }
+
+    public CreateSourceRequest(
+            String name,
+            String url,
+            SourceType type,
+            SourcePriority priority,
+            SourceLanguage language
+    ) {
+        this(name, url, type, priority, language, false);
     }
 }

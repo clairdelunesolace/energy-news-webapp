@@ -154,6 +154,10 @@ public class NewsSyncService {
                 }
             }
 
+            if (!article.getSource().isContentEnrichmentEnabled()) {
+                continue;
+            }
+
             try {
                 article = articleContentService.enrichContent(article);
             } catch (ArticleContentFetchException exception) {

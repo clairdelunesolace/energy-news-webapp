@@ -10,6 +10,7 @@ public record SourceResponse(
         SourcePriority priority,
         SourceLanguage language,
         boolean enabled,
+        boolean contentEnrichmentEnabled,
         Instant createdAt,
         Instant updatedAt
 ) {

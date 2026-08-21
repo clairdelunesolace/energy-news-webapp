@@ -50,6 +50,10 @@ public class Source {
     @Column(nullable = false)
     private boolean enabled = true;
 
+    @Column(name = "content_enrichment_enabled", nullable = false)
+    @ColumnDefault("false")
+    private boolean contentEnrichmentEnabled = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -70,11 +74,23 @@ public class Source {
             SourcePriority priority,
             SourceLanguage language
     ) {
+        this(name, url, type, priority, language, false);
+    }
+
+    public Source(
+            String name,
+            String url,
+            SourceType type,
+            SourcePriority priority,
+            SourceLanguage language,
+            boolean contentEnrichmentEnabled
+    ) {
         this.name = name;
         this.url = url;
         this.type = type;
         this.priority = priority;
         this.language = language == null ? SourceLanguage.EN : language;
+        this.contentEnrichmentEnabled = contentEnrichmentEnabled;
     }
 
     @PrePersist
@@ -135,6 +151,14 @@ public class Source {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public boolean isContentEnrichmentEnabled() {
+        return contentEnrichmentEnabled;
+    }
+
+    public void setContentEnrichmentEnabled(boolean contentEnrichmentEnabled) {
+        this.contentEnrichmentEnabled = contentEnrichmentEnabled;
     }
 
     public Instant getCreatedAt() {

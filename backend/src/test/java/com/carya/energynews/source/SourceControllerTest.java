@@ -1,6 +1,8 @@
 package com.carya.energynews.source;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
@@ -44,7 +46,8 @@ class SourceControllerTest {
                 .andExpect(jsonPath("$[0].type").value("RSS"))
                 .andExpect(jsonPath("$[0].priority").value("HIGH"))
                 .andExpect(jsonPath("$[0].language").value("EN"))
-                .andExpect(jsonPath("$[0].enabled").value(true));
+                .andExpect(jsonPath("$[0].enabled").value(true))
+                .andExpect(jsonPath("$[0].contentEnrichmentEnabled").value(false));
     }
 
     @Test
@@ -55,6 +58,7 @@ class SourceControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.language").value("EN"))
+                .andExpect(jsonPath("$.contentEnrichmentEnabled").value(false))
                 .andExpect(jsonPath("$.url").value("https://example.com/feed"));
     }
 
@@ -93,7 +97,45 @@ class SourceControllerTest {
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.language").value("EN"))
                 .andExpect(jsonPath("$.enabled").value(true))
+                .andExpect(jsonPath("$.contentEnrichmentEnabled").value(false))
                 .andExpect(jsonPath("$.createdAt").value("2026-08-19T01:00:00Z"));
+
+        verify(sourceService).create(request);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void createsSourceWithExplicitContentEnrichmentSetting(
+            boolean contentEnrichmentEnabled
+    ) throws Exception {
+        CreateSourceRequest request = new CreateSourceRequest(
+                "Qualified source",
+                "https://example.com/qualified-feed",
+                SourceType.RSS,
+                SourcePriority.HIGH,
+                SourceLanguage.EN,
+                contentEnrichmentEnabled
+        );
+        when(sourceService.create(request)).thenReturn(sourceResponse(
+                SourceLanguage.EN,
+                contentEnrichmentEnabled
+        ));
+
+        mockMvc.perform(post("/api/sources")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "Qualified source",
+                                  "url": "https://example.com/qualified-feed",
+                                  "type": "RSS",
+                                  "priority": "HIGH",
+                                  "language": "EN",
+                                  "contentEnrichmentEnabled": %s
+                                }
+                                """.formatted(contentEnrichmentEnabled)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.contentEnrichmentEnabled")
+                        .value(contentEnrichmentEnabled));
 
         verify(sourceService).create(request);
     }
@@ -172,10 +214,17 @@ class SourceControllerTest {
     }
 
     private static SourceResponse sourceResponse() {
-        return sourceResponse(SourceLanguage.EN);
+        return sourceResponse(SourceLanguage.EN, false);
     }
 
     private static SourceResponse sourceResponse(SourceLanguage language) {
+        return sourceResponse(language, false);
+    }
+
+    private static SourceResponse sourceResponse(
+            SourceLanguage language,
+            boolean contentEnrichmentEnabled
+    ) {
         return new SourceResponse(
                 1L,
                 "Energy Storage News",
@@ -184,6 +233,7 @@ class SourceControllerTest {
                 SourcePriority.HIGH,
                 language,
                 true,
+                contentEnrichmentEnabled,
                 CREATED_AT,
                 UPDATED_AT
         );

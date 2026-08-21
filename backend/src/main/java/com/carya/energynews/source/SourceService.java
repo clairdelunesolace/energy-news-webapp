@@ -36,7 +36,8 @@ public class SourceService {
                 request.url(),
                 request.type(),
                 request.priority(),
-                request.language()
+                request.language(),
+                request.contentEnrichmentEnabled()
         );
 
         try {
@@ -55,6 +56,7 @@ public class SourceService {
                 source.getPriority(),
                 source.getLanguage(),
                 source.isEnabled(),
+                source.isContentEnrichmentEnabled(),
                 source.getCreatedAt(),
                 source.getUpdatedAt()
         );

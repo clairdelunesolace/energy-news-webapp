@@ -247,6 +247,61 @@ class NewsSyncServiceTest {
     }
 
     @Test
+    void translatesEnglishArticleButSkipsDisabledContentEnrichment() {
+        Source source = source(
+                "Summary-only RSS source",
+                SourceType.RSS,
+                SourceLanguage.EN,
+                false
+        );
+        CollectedArticle collected = collectedArticle("Summary-only article");
+        Article persisted = persistedArticle(source, "Summary-only article", 141L);
+        when(newsCollectionService.collect(source)).thenReturn(List.of(collected));
+        when(articleFilter.evaluate(collected)).thenReturn(accepted());
+        when(articleIngestionService.ingestAll(List.of(collected))).thenReturn(List.of(
+                ArticleIngestionResult.saved(persisted)
+        ));
+        when(translationService.translate(persisted, TranslationLanguage.ZH_CN))
+                .thenReturn(successfulTranslation(persisted));
+
+        NewsSyncResult result = newsSyncService.sync(source);
+
+        assertThat(result).isEqualTo(new NewsSyncResult(
+                1, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0
+        ));
+        verify(translationService).translate(persisted, TranslationLanguage.ZH_CN);
+        verifyNoInteractions(articleContentService, articleContentTranslationService);
+    }
+
+    @Test
+    void skipsDisabledContentEnrichmentForChineseArticle() {
+        Source source = source(
+                "Chinese summary-only source",
+                SourceType.RSS,
+                SourceLanguage.ZH_CN,
+                false
+        );
+        CollectedArticle collected = collectedArticle("Chinese summary-only article");
+        Article persisted = persistedArticle(source, "Chinese summary-only article", 142L);
+        when(newsCollectionService.collect(source)).thenReturn(List.of(collected));
+        when(articleFilter.evaluate(collected)).thenReturn(accepted());
+        when(articleIngestionService.ingestAll(List.of(collected))).thenReturn(List.of(
+                ArticleIngestionResult.saved(persisted)
+        ));
+
+        NewsSyncResult result = newsSyncService.sync(source);
+
+        assertThat(result).isEqualTo(new NewsSyncResult(
+                1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0
+        ));
+        verifyNoInteractions(
+                translationService,
+                articleContentService,
+                articleContentTranslationService
+        );
+    }
+
+    @Test
     void translationFailureKeepsIngestionSuccessfulAndDoesNotFailSource() {
         Source source = source("RSS source", SourceType.RSS, SourceLanguage.EN);
         CollectedArticle collected = collectedArticle("Saved despite translation failure");
@@ -503,12 +558,22 @@ class NewsSyncServiceTest {
     }
 
     private Source source(String name, SourceType type, SourceLanguage language) {
+        return source(name, type, language, true);
+    }
+
+    private Source source(
+            String name,
+            SourceType type,
+            SourceLanguage language,
+            boolean contentEnrichmentEnabled
+    ) {
         return new Source(
                 name,
                 "https://example.com/" + name.replace(' ', '-').toLowerCase(),
                 type,
                 SourcePriority.MEDIUM,
-                language
+                language,
+                contentEnrichmentEnabled
         );
     }
 
