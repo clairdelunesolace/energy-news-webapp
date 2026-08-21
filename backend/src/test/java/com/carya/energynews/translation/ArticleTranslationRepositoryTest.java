@@ -24,6 +24,7 @@ class ArticleTranslationRepositoryTest {
 
     private static final Instant COLLECTED_AT = Instant.parse("2026-08-20T01:00:00Z");
     private static final Instant TRANSLATED_AT = Instant.parse("2026-08-20T02:00:00Z");
+    private static final Instant CONTENT_TRANSLATED_AT = Instant.parse("2026-08-20T03:00:00Z");
 
     @Autowired
     private ArticleTranslationRepository articleTranslationRepository;
@@ -53,7 +54,10 @@ class ArticleTranslationRepositoryTest {
         assertThat(saved.getStatus()).isEqualTo(TranslationStatus.PENDING);
         assertThat(saved.getTitle()).isNull();
         assertThat(saved.getDescription()).isNull();
+        assertThat(saved.getContent()).isNull();
         assertThat(saved.getTranslatedAt()).isNull();
+        assertThat(saved.getContentStatus()).isNull();
+        assertThat(saved.getContentTranslatedAt()).isNull();
         assertThat(saved.getCreatedAt()).isNotNull();
         assertThat(saved.getUpdatedAt()).isEqualTo(saved.getCreatedAt());
     }
@@ -75,6 +79,34 @@ class ArticleTranslationRepositoryTest {
         assertThat(saved.getDescription()).isEqualTo("电池储能项目正在快速增长。");
         assertThat(saved.getStatus()).isEqualTo(TranslationStatus.SUCCESS);
         assertThat(saved.getTranslatedAt()).isEqualTo(TRANSLATED_AT);
+        assertThat(saved.getContent()).isNull();
+        assertThat(saved.getContentStatus()).isNull();
+        assertThat(saved.getContentTranslatedAt()).isNull();
+    }
+
+    @Test
+    void persistsTranslatedContentWithAnIndependentLifecycle() {
+        ArticleTranslation translation = new ArticleTranslation(
+                saveArticle("content-success"),
+                TranslationLanguage.ZH_CN
+        );
+        translation.setTitle("储能部署加速");
+        translation.setStatus(TranslationStatus.SUCCESS);
+        translation.setTranslatedAt(TRANSLATED_AT);
+        translation.setContent("第一段。\n\n第二段。");
+        translation.setContentStatus(ContentTranslationStatus.SUCCESS);
+        translation.setContentTranslatedAt(CONTENT_TRANSLATED_AT);
+
+        ArticleTranslation saved = articleTranslationRepository.saveAndFlush(translation);
+        Long translationId = saved.getId();
+        entityManager.clear();
+
+        ArticleTranslation loaded = articleTranslationRepository.findById(translationId).orElseThrow();
+        assertThat(loaded.getStatus()).isEqualTo(TranslationStatus.SUCCESS);
+        assertThat(loaded.getTranslatedAt()).isEqualTo(TRANSLATED_AT);
+        assertThat(loaded.getContent()).isEqualTo("第一段。\n\n第二段。");
+        assertThat(loaded.getContentStatus()).isEqualTo(ContentTranslationStatus.SUCCESS);
+        assertThat(loaded.getContentTranslatedAt()).isEqualTo(CONTENT_TRANSLATED_AT);
     }
 
     @Test

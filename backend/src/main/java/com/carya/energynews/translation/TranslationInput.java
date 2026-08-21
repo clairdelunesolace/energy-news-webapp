@@ -6,6 +6,16 @@ public record TranslationInput(
         SourceLanguage sourceLanguage,
         TranslationLanguage targetLanguage,
         String title,
-        String description
+        String description,
+        String content
 ) {
+
+    public TranslationInput(
+            SourceLanguage sourceLanguage,
+            TranslationLanguage targetLanguage,
+            String title,
+            String description
+    ) {
+        this(sourceLanguage, targetLanguage, title, description, null);
+    }
 }

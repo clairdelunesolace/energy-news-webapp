@@ -53,6 +53,9 @@ public class ArticleTranslation {
     @Column(columnDefinition = "text")
     private String description;
 
+    @Column(columnDefinition = "text")
+    private String content;
+
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -60,6 +63,13 @@ public class ArticleTranslation {
 
     @Column(name = "translated_at")
     private Instant translatedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "content_status")
+    private ContentTranslationStatus contentStatus;
+
+    @Column(name = "content_translated_at")
+    private Instant contentTranslatedAt;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -115,6 +125,14 @@ public class ArticleTranslation {
         this.description = description;
     }
 
+    public String getContent() {
+        return content;
+    }
+
+    public void setContent(String content) {
+        this.content = content;
+    }
+
     public TranslationStatus getStatus() {
         return status;
     }
@@ -129,6 +147,22 @@ public class ArticleTranslation {
 
     public void setTranslatedAt(Instant translatedAt) {
         this.translatedAt = translatedAt;
+    }
+
+    public ContentTranslationStatus getContentStatus() {
+        return contentStatus;
+    }
+
+    public void setContentStatus(ContentTranslationStatus contentStatus) {
+        this.contentStatus = contentStatus;
+    }
+
+    public Instant getContentTranslatedAt() {
+        return contentTranslatedAt;
+    }
+
+    public void setContentTranslatedAt(Instant contentTranslatedAt) {
+        this.contentTranslatedAt = contentTranslatedAt;
     }
 
     public Instant getCreatedAt() {

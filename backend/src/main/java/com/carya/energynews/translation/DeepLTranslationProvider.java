@@ -12,7 +12,9 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 
 @Component
@@ -20,6 +22,9 @@ public class DeepLTranslationProvider implements TranslationProvider {
 
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(10);
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(30);
+    private static final int MAX_REQUEST_BODY_BYTES = 64 * 1024;
+    private static final int MAX_CONTENT_SEGMENT_BYTES = 32 * 1024;
+    private static final int MAX_TEXTS_PER_REQUEST = 50;
 
     private final DeepLTranslationProperties properties;
     private final ObjectMapper objectMapper;
@@ -41,13 +46,44 @@ public class DeepLTranslationProvider implements TranslationProvider {
         validateInput(input);
         validateApiKey();
 
-        List<String> texts = input.description() == null
-                ? List.of(input.title())
-                : List.of(input.title(), input.description());
+        List<String> shortTexts = new ArrayList<>();
+        if (input.title() != null) {
+            shortTexts.add(input.title());
+        }
+        if (input.description() != null) {
+            shortTexts.add(input.description());
+        }
+
+        List<String> shortTranslations = translateTexts(shortTexts);
+        int shortTranslationIndex = 0;
+        String translatedTitle = input.title() == null
+                ? null
+                : shortTranslations.get(shortTranslationIndex++);
+        String translatedDescription = input.description() == null
+                ? null
+                : shortTranslations.get(shortTranslationIndex);
+        String translatedContent = input.content() == null
+                ? null
+                : translateContent(input.content());
+
+        return new TranslationOutput(
+                translatedTitle,
+                translatedDescription,
+                translatedContent
+        );
+    }
+
+    private List<String> translateTexts(List<String> texts) {
+        if (texts.isEmpty()) {
+            return List.of();
+        }
 
         byte[] requestBody = serialize(new DeepLRequest(texts, "EN", "ZH-HANS"));
-        HttpResponse<byte[]> response = send(createRequest(requestBody));
+        if (requestBody.length > MAX_REQUEST_BODY_BYTES) {
+            throw new TranslationException("DeepL translation request exceeds the safe size limit");
+        }
 
+        HttpResponse<byte[]> response = send(createRequest(requestBody));
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
             throw new TranslationException(
                     "DeepL translation request failed with HTTP " + response.statusCode()
@@ -66,10 +102,117 @@ public class DeepLTranslationProvider implements TranslationProvider {
             throw new TranslationException("DeepL returned a malformed translation response");
         }
 
-        return new TranslationOutput(
-                translations.getFirst().text(),
-                input.description() == null ? null : translations.get(1).text()
+        return translations.stream()
+                .map(DeepLTranslation::text)
+                .toList();
+    }
+
+    private String translateContent(String content) {
+        List<ContentSegment> segments = segmentContent(content);
+        if (segments.isEmpty()) {
+            return "";
+        }
+
+        int paragraphCount = segments.getLast().paragraphIndex() + 1;
+        List<StringBuilder> translatedParagraphs = new ArrayList<>(paragraphCount);
+        for (int index = 0; index < paragraphCount; index++) {
+            translatedParagraphs.add(new StringBuilder());
+        }
+
+        for (List<ContentSegment> batch : batchContentSegments(segments)) {
+            List<String> translatedSegments = translateTexts(
+                    batch.stream().map(ContentSegment::text).toList()
+            );
+            for (int index = 0; index < batch.size(); index++) {
+                ContentSegment segment = batch.get(index);
+                translatedParagraphs.get(segment.paragraphIndex())
+                        .append(translatedSegments.get(index));
+            }
+        }
+
+        return String.join(
+                "\n\n",
+                translatedParagraphs.stream().map(StringBuilder::toString).toList()
         );
+    }
+
+    private List<ContentSegment> segmentContent(String content) {
+        List<ContentSegment> segments = new ArrayList<>();
+        int paragraphIndex = 0;
+        for (String rawParagraph : content.split("(?:\\R\\s*){2,}")) {
+            String paragraph = rawParagraph.trim();
+            if (paragraph.isBlank()) {
+                continue;
+            }
+            for (String segment : splitOversizedParagraph(paragraph)) {
+                segments.add(new ContentSegment(paragraphIndex, segment));
+            }
+            paragraphIndex++;
+        }
+        return segments;
+    }
+
+    private List<String> splitOversizedParagraph(String paragraph) {
+        List<String> segments = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        int currentBytes = 0;
+
+        for (int offset = 0; offset < paragraph.length();) {
+            int codePoint = paragraph.codePointAt(offset);
+            int codePointBytes = utf8Length(codePoint);
+            if (!current.isEmpty()
+                    && currentBytes + codePointBytes > MAX_CONTENT_SEGMENT_BYTES) {
+                segments.add(current.toString());
+                current.setLength(0);
+                currentBytes = 0;
+            }
+            current.appendCodePoint(codePoint);
+            currentBytes += codePointBytes;
+            offset += Character.charCount(codePoint);
+        }
+
+        if (!current.isEmpty()) {
+            segments.add(current.toString());
+        }
+        return segments;
+    }
+
+    private int utf8Length(int codePoint) {
+        return new String(Character.toChars(codePoint)).getBytes(StandardCharsets.UTF_8).length;
+    }
+
+    private List<List<ContentSegment>> batchContentSegments(List<ContentSegment> segments) {
+        List<List<ContentSegment>> batches = new ArrayList<>();
+        List<ContentSegment> currentBatch = new ArrayList<>();
+
+        for (ContentSegment segment : segments) {
+            List<ContentSegment> candidate = new ArrayList<>(currentBatch);
+            candidate.add(segment);
+            if (!currentBatch.isEmpty() && !fitsInOneRequest(candidate)) {
+                batches.add(List.copyOf(currentBatch));
+                currentBatch.clear();
+            }
+            currentBatch.add(segment);
+            if (!fitsInOneRequest(currentBatch)) {
+                throw new TranslationException(
+                        "DeepL content segment exceeds the safe request size limit"
+                );
+            }
+        }
+
+        if (!currentBatch.isEmpty()) {
+            batches.add(List.copyOf(currentBatch));
+        }
+        return batches;
+    }
+
+    private boolean fitsInOneRequest(List<ContentSegment> segments) {
+        if (segments.size() > MAX_TEXTS_PER_REQUEST) {
+            return false;
+        }
+        List<String> texts = segments.stream().map(ContentSegment::text).toList();
+        return serialize(new DeepLRequest(texts, "EN", "ZH-HANS")).length
+                <= MAX_REQUEST_BODY_BYTES;
     }
 
     private void validateInput(TranslationInput input) {
@@ -80,8 +223,8 @@ public class DeepLTranslationProvider implements TranslationProvider {
                 || input.targetLanguage() != TranslationLanguage.ZH_CN) {
             throw new TranslationException("DeepL supports only EN to ZH_CN translation in V1");
         }
-        if (input.title() == null) {
-            throw new TranslationException("Translation title is required");
+        if (input.title() == null && input.description() == null && input.content() == null) {
+            throw new TranslationException("At least one translation text is required");
         }
     }
 
@@ -157,5 +300,8 @@ public class DeepLTranslationProvider implements TranslationProvider {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     private record DeepLTranslation(String text) {
+    }
+
+    private record ContentSegment(int paragraphIndex, String text) {
     }
 }
