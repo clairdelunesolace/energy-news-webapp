@@ -59,6 +59,7 @@ class ArticleControllerTest {
                 .andExpect(jsonPath("$.content[0].original.title").value("Battery storage expands"))
                 .andExpect(jsonPath("$.content[0].translation.language").value("ZH_CN"))
                 .andExpect(jsonPath("$.content[0].translation.title").value("电池储能扩张"))
+                .andExpect(jsonPath("$.content[0].translation.content").value("中文完整正文"))
                 .andExpect(jsonPath("$.content[0].displayTitle").doesNotExist())
                 .andExpect(jsonPath("$.page").value(0))
                 .andExpect(jsonPath("$.size").value(20))
@@ -149,7 +150,8 @@ class ArticleControllerTest {
                 .andExpect(jsonPath("$.collectedAt").value("2026-08-19T06:00:00Z"))
                 .andExpect(jsonPath("$.source.id").value(7))
                 .andExpect(jsonPath("$.original.title").value("Battery storage expands"))
-                .andExpect(jsonPath("$.translation.title").value("电池储能扩张"));
+                .andExpect(jsonPath("$.translation.title").value("电池储能扩张"))
+                .andExpect(jsonPath("$.translation.content").value("中文完整正文"));
     }
 
     @Test
@@ -277,7 +279,8 @@ class ArticleControllerTest {
                 new ArticleTranslationResponse(
                         TranslationLanguage.ZH_CN,
                         "电池储能扩张",
-                        "中文摘要"
+                        "中文摘要",
+                        "中文完整正文"
                 ),
                 CREATED_AT,
                 UPDATED_AT

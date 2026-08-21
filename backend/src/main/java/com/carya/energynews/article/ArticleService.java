@@ -5,6 +5,7 @@ import com.carya.energynews.source.SourceNotFoundException;
 import com.carya.energynews.source.SourceRepository;
 import com.carya.energynews.translation.ArticleTranslation;
 import com.carya.energynews.translation.ArticleTranslationRepository;
+import com.carya.energynews.translation.ContentTranslationStatus;
 import com.carya.energynews.translation.TranslationLanguage;
 import com.carya.energynews.translation.TranslationStatus;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -153,7 +154,12 @@ public class ArticleService {
         return new ArticleTranslationResponse(
                 translation.getLanguage(),
                 translation.getTitle(),
-                translation.getDescription()
+                translation.getDescription(),
+                translation.getContentStatus() == ContentTranslationStatus.SUCCESS
+                        && translation.getContent() != null
+                        && !translation.getContent().isBlank()
+                        ? translation.getContent()
+                        : null
         );
     }
 

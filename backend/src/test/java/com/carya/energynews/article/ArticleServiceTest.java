@@ -6,6 +6,7 @@ import com.carya.energynews.source.SourceNotFoundException;
 import com.carya.energynews.source.SourceRepository;
 import com.carya.energynews.translation.ArticleTranslation;
 import com.carya.energynews.translation.ArticleTranslationRepository;
+import com.carya.energynews.translation.ContentTranslationStatus;
 import com.carya.energynews.translation.TranslationLanguage;
 import com.carya.energynews.translation.TranslationStatus;
 import org.junit.jupiter.api.Test;
@@ -53,6 +54,8 @@ class ArticleServiceTest {
         ArticleTranslation translation = translation(article, TranslationStatus.SUCCESS);
         translation.setTitle("储能扩张");
         translation.setDescription("中文摘要");
+        translation.setContent("中文完整正文");
+        translation.setContentStatus(ContentTranslationStatus.SUCCESS);
         PageRequest pageRequest = PageRequest.of(0, 20);
         when(articleRepository.findAllFiltered(null, "", pageRequest))
                 .thenReturn(new PageImpl<>(List.of(article), pageRequest, 1));
@@ -76,7 +79,8 @@ class ArticleServiceTest {
             assertThat(response.translation()).isEqualTo(new ArticleTranslationResponse(
                     TranslationLanguage.ZH_CN,
                     "储能扩张",
-                    "中文摘要"
+                    "中文摘要",
+                    "中文完整正文"
             ));
         });
         verify(articleRepository).findAllFiltered(null, "", pageRequest);
@@ -185,6 +189,35 @@ class ArticleServiceTest {
                 "中文标题",
                 null
         ));
+    }
+
+    @Test
+    void exposesTranslatedContentOnlyWhenItsIndependentLifecycleSucceeded() {
+        Article article = article(SourceLanguage.EN);
+        ArticleTranslation translation = translation(article, TranslationStatus.SUCCESS);
+        translation.setTitle("中文标题");
+        translation.setContent("中文完整正文");
+        when(articleRepository.findById(1L)).thenReturn(Optional.of(article));
+        when(articleTranslationRepository.findByArticleIdAndLanguageAndStatus(
+                1L,
+                TranslationLanguage.ZH_CN,
+                TranslationStatus.SUCCESS
+        )).thenReturn(Optional.of(translation));
+
+        assertThat(articleService.getById(1L).translation().content()).isNull();
+
+        translation.setContentStatus(ContentTranslationStatus.PENDING);
+        assertThat(articleService.getById(1L).translation().content()).isNull();
+
+        translation.setContentStatus(ContentTranslationStatus.FAILED);
+        assertThat(articleService.getById(1L).translation().content()).isNull();
+
+        translation.setContentStatus(ContentTranslationStatus.SUCCESS);
+        assertThat(articleService.getById(1L).translation().content())
+                .isEqualTo("中文完整正文");
+
+        translation.setContent("   ");
+        assertThat(articleService.getById(1L).translation().content()).isNull();
     }
 
     @Test
