@@ -7,6 +7,8 @@ import com.rometools.rome.feed.synd.SyndFeed;
 import com.rometools.rome.io.FeedException;
 import com.rometools.rome.io.SyndFeedInput;
 import com.rometools.rome.io.XmlReader;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
 import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayInputStream;
@@ -20,6 +22,9 @@ import java.util.List;
 
 @Component
 public class RssCollector implements NewsCollector {
+
+    private static final String NON_SUMMARY_ELEMENTS =
+            "figure, img, picture, source, script, style, iframe, form, button, noscript";
 
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
@@ -91,10 +96,25 @@ public class RssCollector implements NewsCollector {
         return new CollectedArticle(
                 entry.getTitle(),
                 entry.getLink(),
-                entry.getDescription() == null ? null : entry.getDescription().getValue(),
+                normalizeDescription(
+                        entry.getDescription() == null
+                                ? null
+                                : entry.getDescription().getValue()
+                ),
                 null,
                 entry.getPublishedDate() == null ? null : entry.getPublishedDate().toInstant(),
                 sourceId
         );
+    }
+
+    private String normalizeDescription(String description) {
+        if (description == null) {
+            return null;
+        }
+
+        Document document = Jsoup.parseBodyFragment(description);
+        document.select(NON_SUMMARY_ELEMENTS).remove();
+        String readableText = document.body().text().trim();
+        return readableText.isBlank() ? null : readableText;
     }
 }

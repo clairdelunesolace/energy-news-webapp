@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Description normalization</title>
+    <link>https://example.com</link>
+    <description>RSS description normalization fixtures</description>
+    <item>
+      <title>Plain text</title>
+      <link>https://example.com/plain</link>
+      <description>Battery storage costs fell 12%—developers’ outlook improved.</description>
+    </item>
+    <item>
+      <title>Utility Dive HTML</title>
+      <link>https://example.com/utility-dive-html</link>
+      <description><![CDATA[
+        <figure><div><img src="https://example.com/battery.jpg" alt="Battery project"></div></figure>
+        <p>Experts say battery storage will support the grid.</p>
+      ]]></description>
+    </item>
+    <item>
+      <title>Multiple paragraphs</title>
+      <link>https://example.com/multiple-paragraphs</link>
+      <description><![CDATA[
+        <p>First summary paragraph.</p>
+        <p>Second summary paragraph.</p>
+      ]]></description>
+    </item>
+    <item>
+      <title>HTML entities</title>
+      <link>https://example.com/html-entities</link>
+      <description><![CDATA[
+        <p>Storage R&amp;D&nbsp;is developers&#39; priority.</p>
+      ]]></description>
+    </item>
+    <item>
+      <title>Non-readable markup only</title>
+      <link>https://example.com/non-readable</link>
+      <description><![CDATA[
+        <figure><img src="https://example.com/image.jpg"></figure>
+        <picture><source srcset="image.webp"><img src="image.jpg"></picture>
+        <script>alert('not summary text')</script>
+        <style>.hidden { display: none; }</style>
+        <iframe src="https://example.com/widget"></iframe>
+        <form><button>Subscribe</button></form>
+        <noscript>Enable scripts to view this image.</noscript>
+      ]]></description>
+    </item>
+    <item>
+      <title>Chinese Unicode</title>
+      <link>https://example.com/chinese-unicode</link>
+      <description>储能项目“如期投运”，容量为 200 兆瓦时。</description>
+    </item>
+  </channel>
+</rss>

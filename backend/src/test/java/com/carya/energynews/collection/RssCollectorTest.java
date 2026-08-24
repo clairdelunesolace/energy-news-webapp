@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -150,6 +151,41 @@ class RssCollectorTest {
     }
 
     @Test
+    void preservesPlainTextDescription() throws IOException {
+        assertThat(descriptionFromFixture("Plain text"))
+                .isEqualTo("Battery storage costs fell 12%—developers’ outlook improved.");
+    }
+
+    @Test
+    void removesUtilityDiveLikeFigureMarkup() throws IOException {
+        assertThat(descriptionFromFixture("Utility Dive HTML"))
+                .isEqualTo("Experts say battery storage will support the grid.");
+    }
+
+    @Test
+    void normalizesMultipleHtmlParagraphsToReadableText() throws IOException {
+        assertThat(descriptionFromFixture("Multiple paragraphs"))
+                .isEqualTo("First summary paragraph. Second summary paragraph.");
+    }
+
+    @Test
+    void decodesHtmlEntities() throws IOException {
+        assertThat(descriptionFromFixture("HTML entities"))
+                .isEqualTo("Storage R&D is developers' priority.");
+    }
+
+    @Test
+    void returnsNullForNonReadableMarkupOnlyDescription() throws IOException {
+        assertThat(descriptionFromFixture("Non-readable markup only")).isNull();
+    }
+
+    @Test
+    void preservesChineseAndUnicodeDescription() throws IOException {
+        assertThat(descriptionFromFixture("Chinese Unicode"))
+                .isEqualTo("储能项目“如期投运”，容量为 200 兆瓦时。");
+    }
+
+    @Test
     void rejectsNonRssSources() {
         Source source = new Source(
                 "API source",
@@ -201,6 +237,25 @@ class RssCollectorTest {
         );
         ReflectionTestUtils.setField(source, "id", 42L);
         return source;
+    }
+
+    private String descriptionFromFixture(String title) throws IOException {
+        String path = "/description-normalization";
+        serve(path, 200, readFixture("rss-description-normalization.xml"));
+        return collector.collect(rssSource(path)).stream()
+                .filter(article -> article.title().equals(title))
+                .findFirst()
+                .orElseThrow()
+                .description();
+    }
+
+    private String readFixture(String name) throws IOException {
+        try (InputStream input = getClass().getResourceAsStream("/fixtures/" + name)) {
+            if (input == null) {
+                throw new IOException("Missing RSS fixture: " + name);
+            }
+            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 
     private String feedUrl(String path) {
