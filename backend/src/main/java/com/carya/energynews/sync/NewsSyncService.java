@@ -19,6 +19,8 @@ import com.carya.energynews.translation.TranslationException;
 import com.carya.energynews.translation.TranslationLanguage;
 import com.carya.energynews.translation.TranslationService;
 import com.carya.energynews.translation.TranslationStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -26,6 +28,8 @@ import java.util.List;
 
 @Service
 public class NewsSyncService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(NewsSyncService.class);
 
     private final SourceRepository sourceRepository;
     private final NewsCollectionService newsCollectionService;
@@ -162,6 +166,13 @@ public class NewsSyncService {
                 article = articleContentService.enrichContent(article);
             } catch (ArticleContentFetchException exception) {
                 contentFetchFailed++;
+                LOGGER.warn(
+                        "Article content fetch failed: articleId={}, source={}, url={}, reason={}",
+                        article.getId(),
+                        article.getSource().getName(),
+                        article.getUrl(),
+                        exception.getMessage()
+                );
                 continue;
             }
 
@@ -186,6 +197,13 @@ public class NewsSyncService {
                 }
             } catch (TranslationException exception) {
                 contentTranslationFailed++;
+                LOGGER.warn(
+                        "Article content translation failed: articleId={}, source={}, url={}, reason={}",
+                        article.getId(),
+                        article.getSource().getName(),
+                        article.getUrl(),
+                        exception.getMessage()
+                );
             }
         }
 

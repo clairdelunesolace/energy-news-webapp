@@ -32,6 +32,8 @@ import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
@@ -45,7 +47,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class NewsSyncServiceTest {
 
     @Mock
@@ -369,7 +371,9 @@ class NewsSyncServiceTest {
     }
 
     @Test
-    void contentFetchFailureDoesNotInvalidateTranslationOrStopLaterArticles() {
+    void contentFetchFailureDoesNotInvalidateTranslationOrStopLaterArticles(
+            CapturedOutput output
+    ) {
         Source source = source("RSS source", SourceType.RSS, SourceLanguage.EN);
         CollectedArticle firstCollected = collectedArticle("First fetch failure");
         CollectedArticle secondCollected = collectedArticle("Second fetch success");
@@ -407,10 +411,16 @@ class NewsSyncServiceTest {
                 .translateContent(firstPersisted, TranslationLanguage.ZH_CN);
         verify(articleContentTranslationService)
                 .translateContent(secondPersisted, TranslationLanguage.ZH_CN);
+        assertThat(output).contains(
+                "Article content fetch failed: articleId=21, source=RSS source, "
+                        + "url=https://example.com/persisted/21, reason=Publisher unavailable"
+        );
     }
 
     @Test
-    void contentTranslationFailurePreservesOriginalContentAndContinues() {
+    void contentTranslationFailurePreservesOriginalContentAndContinues(
+            CapturedOutput output
+    ) {
         Source source = source("RSS source", SourceType.RSS, SourceLanguage.EN);
         CollectedArticle firstCollected = collectedArticle("First content translation failure");
         CollectedArticle secondCollected = collectedArticle("Second content translation success");
@@ -452,6 +462,11 @@ class NewsSyncServiceTest {
         assertThat(result.failedSources()).isZero();
         verify(articleContentTranslationService)
                 .translateContent(secondPersisted, TranslationLanguage.ZH_CN);
+        assertThat(output).contains(
+                "Article content translation failed: articleId=23, source=RSS source, "
+                        + "url=https://example.com/persisted/23, "
+                        + "reason=Content translation unavailable"
+        );
     }
 
     @Test
