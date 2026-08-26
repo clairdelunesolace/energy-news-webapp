@@ -33,6 +33,12 @@ app:
       - thermal energy storage
       - flow battery
       - sodium-ion battery
+      - energy storage system
+      - grid-scale storage
+      - stationary battery
+      - stationary storage
+      - utility-scale battery
+      - residential battery
     weak-keywords:
       - battery
       - LFP
@@ -41,3 +47,5 @@ app:
       - VPP
       - PCS
       - power conversion
+      - grid-forming
+      - behind-the-meter
