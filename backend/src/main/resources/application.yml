@@ -9,7 +9,19 @@ spring:
     hibernate:
       ddl-auto: update
 
+server:
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        same-site: lax
+        secure: ${SESSION_COOKIE_SECURE:false}
+
 app:
+  security:
+    admin:
+      username: "${ADMIN_USERNAME:admin}"
+      password: "${ADMIN_PASSWORD:}"
   translation:
     deepl:
       base-url: "${DEEPL_BASE_URL:https://api-free.deepl.com}"

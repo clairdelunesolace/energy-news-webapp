@@ -83,6 +83,103 @@ a {
   font-size: 0.8125rem;
 }
 
+.app-header__account {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+}
+
+.app-header__username {
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+}
+
+.app-header__logout {
+  padding: var(--spacing-2) var(--spacing-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  color: var(--color-accent-strong);
+  background: var(--color-surface);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.app-header__logout:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  background: var(--color-surface-muted);
+}
+
+.app-header__logout:disabled {
+  color: var(--color-text-secondary);
+  cursor: not-allowed;
+}
+
+.auth-loading,
+.login-page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: var(--spacing-6);
+}
+
+.auth-loading {
+  color: var(--color-text-secondary);
+}
+
+.login-card {
+  width: min(100%, 25rem);
+  padding: var(--spacing-8);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  background: var(--color-surface);
+}
+
+.login-card__brand {
+  margin: 0;
+  color: var(--color-accent-strong);
+  font-size: 0.875rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+}
+
+.login-card h1 {
+  margin: var(--spacing-2) 0 var(--spacing-6);
+  font-size: 2rem;
+}
+
+.login-form {
+  display: grid;
+  gap: var(--spacing-3);
+}
+
+.login-form label {
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+
+.login-form input {
+  width: 100%;
+  height: 2.75rem;
+  padding: 0 var(--spacing-3);
+  border: 1px solid #b9c8bf;
+  border-radius: var(--radius-small);
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+}
+
+.login-form__error {
+  margin: 0;
+  color: var(--color-error);
+  font-size: 0.875rem;
+}
+
+.login-form__submit {
+  width: 100%;
+  margin-top: var(--spacing-2);
+}
+
 .page-shell {
   width: min(100% - 2 * var(--spacing-6), var(--content-width));
   margin: 0 auto;
@@ -143,6 +240,8 @@ a {
 .feed-toolbar input:focus-visible,
 .feed-toolbar select:focus-visible,
 .button:focus-visible,
+.app-header__logout:focus-visible,
+.login-form input:focus-visible,
 .article-list-item__title a:focus-visible,
 .article-list-item__external-link:focus-visible,
 .article-detail__back:focus-visible,
@@ -432,6 +531,18 @@ a {
   .app-header__content,
   .page-shell {
     width: min(100% - 2 * var(--spacing-4), var(--content-width));
+  }
+
+  .app-header__username {
+    display: none;
+  }
+
+  .login-page {
+    padding: var(--spacing-4);
+  }
+
+  .login-card {
+    padding: var(--spacing-6);
   }
 
   .page-shell {

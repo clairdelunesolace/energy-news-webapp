@@ -5,6 +5,7 @@ import com.carya.energynews.source.SourceLanguage;
 import com.carya.energynews.translation.TranslationLanguage;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -24,6 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(ArticleController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class ArticleControllerTest {
 
     private static final Instant PUBLISHED_AT = Instant.parse("2026-08-18T12:00:00Z");
