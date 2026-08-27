@@ -42,6 +42,16 @@ class NewsDiscoveryServiceTest {
     }
 
     @Test
+    void delegatesProviderName() {
+        when(provider.providerName()).thenReturn("brave-news");
+
+        assertThat(discoveryService.providerName()).isEqualTo("brave-news");
+
+        verify(provider).providerName();
+        verifyNoMoreInteractions(provider);
+    }
+
+    @Test
     void propagatesProviderNeutralExceptionUnchanged() {
         NewsDiscoveryQuery query = query();
         NewsDiscoveryException failure = new NewsDiscoveryException("Provider unavailable");

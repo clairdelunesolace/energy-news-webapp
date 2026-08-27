@@ -18,6 +18,13 @@ server:
         secure: ${SESSION_COOKIE_SECURE:false}
 
 app:
+  discovery:
+    provider: ${NEWS_DISCOVERY_PROVIDER:none}
+    brave:
+      api-key: "${BRAVE_SEARCH_API_KEY:}"
+    gnews:
+      api-key: "${GNEWS_API_KEY:}"
+      max-results-per-request: ${GNEWS_MAX_RESULTS_PER_REQUEST:10}
   security:
     admin:
       username: "${ADMIN_USERNAME:admin}"
