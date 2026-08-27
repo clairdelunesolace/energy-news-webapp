@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 
 export function AppHeader() {
@@ -27,6 +27,12 @@ export function AppHeader() {
         <Link className="app-brand" to="/" aria-label="储能资讯首页">
           储能资讯
         </Link>
+        <nav className="app-header__navigation" aria-label="主要导航">
+          <NavLink to="/" end>
+            新闻
+          </NavLink>
+          <NavLink to="/watchlists">关注关键词</NavLink>
+        </nav>
         <div className="app-header__account">
           <span className="app-header__username">{username}</span>
           <button

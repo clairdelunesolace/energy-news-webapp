@@ -12,6 +12,12 @@ import com.carya.energynews.source.SourceService;
 import com.carya.energynews.sync.NewsSyncController;
 import com.carya.energynews.sync.NewsSyncResult;
 import com.carya.energynews.sync.NewsSyncService;
+import com.carya.energynews.watchlist.KeywordController;
+import com.carya.energynews.watchlist.KeywordRepository;
+import com.carya.energynews.watchlist.WatchlistController;
+import com.carya.energynews.watchlist.WatchlistRepository;
+import com.carya.energynews.watchlist.WatchlistResponse;
+import com.carya.energynews.watchlist.WatchlistService;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,6 +39,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -47,7 +54,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         HealthController.class,
         ArticleController.class,
         SourceController.class,
-        NewsSyncController.class
+        NewsSyncController.class,
+        WatchlistController.class,
+        KeywordController.class
 })
 @Import(SecurityConfig.class)
 @TestPropertySource(properties = {
@@ -76,6 +85,15 @@ class SecurityIntegrationTest {
 
     @MockitoBean
     private SourceRepository sourceRepository;
+
+    @MockitoBean
+    private WatchlistService watchlistService;
+
+    @MockitoBean
+    private WatchlistRepository watchlistRepository;
+
+    @MockitoBean
+    private KeywordRepository keywordRepository;
 
     @Test
     void applicationFilterChainUsesCookieCsrfRepository() {
@@ -112,7 +130,11 @@ class SecurityIntegrationTest {
                 .andExpect(status().isUnauthorized());
         mockMvc.perform(get("/api/sources"))
                 .andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/api/watchlists"))
+                .andExpect(status().isUnauthorized());
         mockMvc.perform(post("/api/news-sync"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/watchlists"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -178,6 +200,37 @@ class SecurityIntegrationTest {
                         .header(csrf.headerName(), csrf.token()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.collected").value(0));
+    }
+
+    @Test
+    void watchlistMutationRequiresCsrfAndSucceedsWithValidToken() throws Exception {
+        mockMvc.perform(post("/api/watchlists")
+                        .with(user("configured-admin"))
+                        .contentType("application/json")
+                        .content("""
+                                {"name":"NVIDIA"}
+                                """))
+                .andExpect(status().isForbidden());
+
+        CsrfValues csrf = getCsrf(null);
+        when(watchlistService.create(any())).thenReturn(new WatchlistResponse(
+                1L,
+                "NVIDIA",
+                true,
+                null,
+                null,
+                List.of()
+        ));
+        mockMvc.perform(post("/api/watchlists")
+                        .with(user("configured-admin"))
+                        .cookie(csrf.cookie())
+                        .header(csrf.headerName(), csrf.token())
+                        .contentType("application/json")
+                        .content("""
+                                {"name":"NVIDIA"}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.name").value("NVIDIA"));
     }
 
     @Test

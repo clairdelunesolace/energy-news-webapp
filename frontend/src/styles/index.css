@@ -71,11 +71,38 @@ a {
 }
 
 .app-brand {
+  flex: 0 0 auto;
   color: var(--color-accent-strong);
   font-size: 1.25rem;
   font-weight: 750;
   letter-spacing: 0.04em;
   text-decoration: none;
+}
+
+.app-header__navigation {
+  display: flex;
+  align-self: stretch;
+  align-items: center;
+  gap: var(--spacing-5);
+  margin-left: var(--spacing-8);
+  margin-right: auto;
+}
+
+.app-header__navigation a {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.app-header__navigation a:hover,
+.app-header__navigation a[aria-current="page"] {
+  border-bottom-color: var(--color-accent);
+  color: var(--color-accent-strong);
 }
 
 .app-header__section {
@@ -251,6 +278,13 @@ a {
   outline-offset: 2px;
 }
 
+.app-header__navigation a:focus-visible,
+.watchlists-page input:focus-visible,
+.text-button:focus-visible {
+  outline: 3px solid rgb(23 107 77 / 20%);
+  outline-offset: 2px;
+}
+
 .feed-toolbar select:disabled {
   color: var(--color-text-secondary);
   background: var(--color-surface-muted);
@@ -294,6 +328,12 @@ a {
   color: #8a9790;
   background: var(--color-surface-muted);
   cursor: not-allowed;
+}
+
+.button--compact {
+  min-height: 2.25rem;
+  padding: 0 var(--spacing-3);
+  font-size: 0.8125rem;
 }
 
 .article-feed__results {
@@ -527,6 +567,231 @@ a {
   text-align: center;
 }
 
+.watchlists-page__heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(20rem, 29rem);
+  gap: var(--spacing-8);
+  align-items: end;
+  margin-bottom: var(--spacing-8);
+}
+
+.watchlists-page__heading h1 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 2.75rem);
+  line-height: 1.15;
+}
+
+.watchlists-page__heading p {
+  max-width: 38rem;
+  margin: var(--spacing-3) 0 0;
+  color: var(--color-text-secondary);
+  line-height: 1.65;
+}
+
+.watchlist-create-form,
+.keyword-create-form {
+  display: grid;
+  gap: var(--spacing-2);
+}
+
+.watchlist-create-form label,
+.keyword-create-form label {
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+
+.inline-form__controls {
+  display: flex;
+  gap: var(--spacing-2);
+}
+
+.inline-form__controls .button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.watchlists-page input {
+  width: 100%;
+  min-width: 0;
+  height: 2.75rem;
+  padding: 0 var(--spacing-3);
+  border: 1px solid #b9c8bf;
+  border-radius: var(--radius-small);
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+}
+
+.watchlists-page input:disabled {
+  color: var(--color-text-secondary);
+  background: var(--color-surface-muted);
+}
+
+.watchlists-page__operation-error {
+  margin: calc(-1 * var(--spacing-4)) 0 var(--spacing-6);
+  padding: var(--spacing-3) var(--spacing-4);
+  border-left: 3px solid var(--color-error);
+  color: var(--color-error);
+  background: #fff7f7;
+  font-size: 0.875rem;
+}
+
+.watchlists-empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--spacing-4);
+  padding: var(--spacing-10) var(--spacing-4);
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.watchlists-empty p,
+.status-message p {
+  margin: 0;
+}
+
+.status-message .button {
+  margin-top: var(--spacing-4);
+}
+
+.watchlist-list {
+  border-top: 1px solid var(--color-border);
+}
+
+.watchlist-section {
+  padding: var(--spacing-6) 0 var(--spacing-8);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.watchlist-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-4);
+  margin-bottom: var(--spacing-4);
+}
+
+.watchlist-section__title-row,
+.watchlist-section__actions,
+.keyword-row__value,
+.keyword-row__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+}
+
+.watchlist-section h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  line-height: 1.35;
+}
+
+.status-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  padding: 0 var(--spacing-2);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.status-label--enabled {
+  border-color: #b8d6c8;
+  color: var(--color-accent-strong);
+  background: #edf7f2;
+}
+
+.text-button {
+  padding: var(--spacing-1) 0;
+  border: 0;
+  color: var(--color-accent-strong);
+  background: transparent;
+  font-size: 0.8125rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.text-button:hover:not(:disabled) {
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.text-button--danger {
+  color: var(--color-error);
+}
+
+.text-button:disabled {
+  color: #8a9790;
+  cursor: not-allowed;
+}
+
+.watchlist-rename-form,
+.keyword-edit-form {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--spacing-2);
+  max-width: 40rem;
+}
+
+.watchlist-rename-form input,
+.keyword-edit-form input {
+  height: 2.25rem;
+}
+
+.keyword-list {
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--color-border);
+  list-style: none;
+}
+
+.keyword-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 3.5rem;
+  gap: var(--spacing-4);
+  padding: var(--spacing-2) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.keyword-row__value > span:first-child {
+  overflow-wrap: anywhere;
+}
+
+.watchlist-section__no-keywords {
+  margin: 0;
+  padding: var(--spacing-4) 0;
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
+.keyword-create-form {
+  max-width: 38rem;
+  margin-top: var(--spacing-4);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 @media (max-width: 44rem) {
   .app-header__content,
   .page-shell {
@@ -535,6 +800,15 @@ a {
 
   .app-header__username {
     display: none;
+  }
+
+  .app-header__navigation {
+    gap: var(--spacing-3);
+    margin-left: var(--spacing-4);
+  }
+
+  .app-header__navigation a {
+    font-size: 0.8125rem;
   }
 
   .login-page {
@@ -594,5 +868,43 @@ a {
 
   .pagination .button {
     padding: 0 var(--spacing-3);
+  }
+
+  .watchlists-page__heading {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-5);
+    margin-bottom: var(--spacing-6);
+  }
+
+  .inline-form__controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .watchlist-section__header,
+  .keyword-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .watchlist-section__actions,
+  .keyword-row__actions {
+    flex-wrap: wrap;
+  }
+
+  .watchlist-rename-form,
+  .keyword-edit-form {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .watchlist-rename-form input,
+  .keyword-edit-form input {
+    flex: 1 0 100%;
+  }
+
+  .keyword-row__value {
+    width: 100%;
+    justify-content: space-between;
   }
 }

@@ -4,6 +4,7 @@ import { AppHeader } from './components/AppHeader'
 import { ArticleDetailPage } from './pages/ArticleDetailPage'
 import { HomePage } from './pages/HomePage'
 import { LoginPage } from './pages/LoginPage'
+import { WatchlistsPage } from './pages/WatchlistsPage'
 
 export default function App() {
   return (
@@ -12,6 +13,7 @@ export default function App() {
       <Route element={<ProtectedApp />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/articles/:id" element={<ArticleDetailPage />} />
+        <Route path="/watchlists" element={<WatchlistsPage />} />
       </Route>
     </Routes>
   )
