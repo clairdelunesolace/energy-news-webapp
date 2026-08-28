@@ -65,6 +65,13 @@ class WatchlistDiscoveryControllerTest {
                 .andExpect(jsonPath("$.keywordMatchesExisting").value(1))
                 .andExpect(jsonPath("$.skippedUnsupportedLanguage").value(1))
                 .andExpect(jsonPath("$.skippedInvalidUrl").value(0))
+                .andExpect(jsonPath("$.postProcessingAttempted").value(3))
+                .andExpect(jsonPath("$.metadataTranslationSucceeded").value(2))
+                .andExpect(jsonPath("$.metadataTranslationFailed").value(1))
+                .andExpect(jsonPath("$.contentExtractionSucceeded").value(1))
+                .andExpect(jsonPath("$.contentExtractionFailed").value(2))
+                .andExpect(jsonPath("$.contentTranslationSucceeded").value(1))
+                .andExpect(jsonPath("$.contentTranslationFailed").value(0))
                 .andExpect(jsonPath("$.failedKeywords[0].keyword").value("800VDC"))
                 .andExpect(jsonPath("$.keywordResults[0].keyword").value("NVIDIA"));
 
@@ -129,6 +136,13 @@ class WatchlistDiscoveryControllerTest {
                 2,
                 4,
                 1,
+                1,
+                0,
+                3,
+                2,
+                1,
+                1,
+                2,
                 1,
                 0,
                 List.of(new WatchlistDiscoveryKeywordFailure(

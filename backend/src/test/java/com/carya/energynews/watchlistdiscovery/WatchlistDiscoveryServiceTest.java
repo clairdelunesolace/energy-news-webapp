@@ -1,11 +1,18 @@
 package com.carya.energynews.watchlistdiscovery;
 
+import com.carya.energynews.article.Article;
+import com.carya.energynews.article.ArticlePostProcessingResult;
+import com.carya.energynews.article.ArticlePostProcessingService;
 import com.carya.energynews.discovery.DiscoveredArticle;
 import com.carya.energynews.discovery.NewsDiscoveryException;
 import com.carya.energynews.discovery.NewsDiscoveryProvider;
 import com.carya.energynews.discovery.NewsDiscoveryQuery;
 import com.carya.energynews.discovery.NewsDiscoveryQueryFactory;
 import com.carya.energynews.discovery.NewsDiscoveryService;
+import com.carya.energynews.source.Source;
+import com.carya.energynews.source.SourceLanguage;
+import com.carya.energynews.source.SourcePriority;
+import com.carya.energynews.source.SourceType;
 import com.carya.energynews.watchlist.Keyword;
 import com.carya.energynews.watchlist.Watchlist;
 import com.carya.energynews.watchlist.WatchlistNotFoundException;
@@ -47,6 +54,9 @@ class WatchlistDiscoveryServiceTest {
     @Mock
     private WatchlistDiscoveryPersistenceService persistenceService;
 
+    @Mock
+    private ArticlePostProcessingService postProcessingService;
+
     private WatchlistDiscoveryService service;
 
     @BeforeEach
@@ -67,7 +77,7 @@ class WatchlistDiscoveryServiceTest {
         assertThatThrownBy(() -> service.run(request(2L, null, null, 10)))
                 .isInstanceOf(WatchlistDisabledException.class)
                 .hasMessage("Watchlist with id 2 is disabled");
-        verifyNoInteractions(newsDiscoveryProvider, persistenceService);
+        verifyNoInteractions(newsDiscoveryProvider, persistenceService, postProcessingService);
     }
 
     @Test
@@ -84,7 +94,7 @@ class WatchlistDiscoveryServiceTest {
         assertThat(response.keywordsProcessed()).isZero();
         assertThat(response.keywordsFailed()).isZero();
         assertThat(response.keywordResults()).isEmpty();
-        verifyNoInteractions(newsDiscoveryProvider, persistenceService);
+        verifyNoInteractions(newsDiscoveryProvider, persistenceService, postProcessingService);
     }
 
     @Test
@@ -115,15 +125,17 @@ class WatchlistDiscoveryServiceTest {
                 Instant.parse("2026-08-26T23:59:59.999999999Z"),
                 7
         ))).thenThrow(new NewsDiscoveryException("gnews was rate limited"));
+        Article savedArticle = article(101L);
         when(persistenceService.ingestAndMatch(
                 relevant,
                 "https://example.com/relevant",
                 battery.getId()
         )).thenReturn(new WatchlistDiscoveryPersistenceResult(
                 WatchlistDiscoveryPersistenceResult.Status.SAVED,
-                101L,
+                savedArticle,
                 true
         ));
+        when(postProcessingService.process(savedArticle)).thenReturn(successfulPostProcessing());
 
         WatchlistDiscoveryRunResponse response = service.run(request(
                 1L,
@@ -139,6 +151,10 @@ class WatchlistDiscoveryServiceTest {
         assertThat(response.saved()).isEqualTo(1);
         assertThat(response.duplicates()).isZero();
         assertThat(response.keywordMatchesCreated()).isEqualTo(1);
+        assertThat(response.postProcessingAttempted()).isEqualTo(1);
+        assertThat(response.metadataTranslationSucceeded()).isEqualTo(1);
+        assertThat(response.contentExtractionSucceeded()).isEqualTo(1);
+        assertThat(response.contentTranslationSucceeded()).isEqualTo(1);
         assertThat(response.failedKeywords()).containsExactly(
                 new WatchlistDiscoveryKeywordFailure(
                         13L,
@@ -167,28 +183,32 @@ class WatchlistDiscoveryServiceTest {
         );
         when(newsDiscoveryProvider.discover(any(NewsDiscoveryQuery.class)))
                 .thenReturn(List.of(article));
+        Article savedArticle = article(101L);
         when(persistenceService.ingestAndMatch(
                 article,
                 "https://example.com/shared",
                 nvidia.getId()
         )).thenReturn(new WatchlistDiscoveryPersistenceResult(
                 WatchlistDiscoveryPersistenceResult.Status.SAVED,
-                101L,
+                savedArticle,
                 true
         ));
         when(persistenceService.matchExistingArticle(101L, voltage.getId())).thenReturn(true);
+        when(postProcessingService.process(savedArticle)).thenReturn(successfulPostProcessing());
 
         WatchlistDiscoveryRunResponse response = service.run(request(1L, null, null, 10));
 
         assertThat(response.saved()).isEqualTo(1);
         assertThat(response.duplicates()).isEqualTo(1);
         assertThat(response.keywordMatchesCreated()).isEqualTo(2);
+        assertThat(response.postProcessingAttempted()).isEqualTo(1);
         verify(persistenceService).ingestAndMatch(
                 article,
                 "https://example.com/shared",
                 nvidia.getId()
         );
         verify(persistenceService).matchExistingArticle(101L, voltage.getId());
+        verify(postProcessingService).process(savedArticle);
     }
 
     @Test
@@ -213,7 +233,7 @@ class WatchlistDiscoveryServiceTest {
                 keyword.getId()
         )).thenReturn(new WatchlistDiscoveryPersistenceResult(
                 WatchlistDiscoveryPersistenceResult.Status.DUPLICATE,
-                100L,
+                article(100L),
                 true
         ));
         when(persistenceService.ingestAndMatch(
@@ -229,6 +249,52 @@ class WatchlistDiscoveryServiceTest {
         assertThat(response.keywordMatchesCreated()).isEqualTo(1);
         assertThat(response.skippedUnsupportedLanguage()).isEqualTo(1);
         assertThat(response.skippedInvalidUrl()).isEqualTo(1);
+        assertThat(response.postProcessingAttempted()).isZero();
+        verifyNoInteractions(postProcessingService);
+    }
+
+    @Test
+    void articlePostProcessingFailureDoesNotStopNextArticleOrFailKeyword() {
+        Watchlist watchlist = watchlist(1L, "NVIDIA Test", true);
+        Keyword keyword = keyword(watchlist, 11L, "NVIDIA", true);
+        when(watchlistRepository.findWithKeywordsById(1L)).thenReturn(Optional.of(watchlist));
+        DiscoveredArticle first = article("NVIDIA first", "https://example.com/first");
+        DiscoveredArticle second = article("NVIDIA second", "https://example.com/second");
+        when(newsDiscoveryProvider.discover(any(NewsDiscoveryQuery.class)))
+                .thenReturn(List.of(first, second));
+        Article firstSaved = article(201L);
+        Article secondSaved = article(202L);
+        when(persistenceService.ingestAndMatch(first, first.url(), keyword.getId()))
+                .thenReturn(new WatchlistDiscoveryPersistenceResult(
+                        WatchlistDiscoveryPersistenceResult.Status.SAVED,
+                        firstSaved,
+                        true
+                ));
+        when(persistenceService.ingestAndMatch(second, second.url(), keyword.getId()))
+                .thenReturn(new WatchlistDiscoveryPersistenceResult(
+                        WatchlistDiscoveryPersistenceResult.Status.SAVED,
+                        secondSaved,
+                        true
+                ));
+        when(postProcessingService.process(firstSaved)).thenReturn(
+                new ArticlePostProcessingResult(false, true, false, true, false, false)
+        );
+        when(postProcessingService.process(secondSaved)).thenReturn(successfulPostProcessing());
+
+        WatchlistDiscoveryRunResponse response = service.run(request(1L, null, null, 10));
+
+        assertThat(response.saved()).isEqualTo(2);
+        assertThat(response.keywordsProcessed()).isEqualTo(1);
+        assertThat(response.keywordsFailed()).isZero();
+        assertThat(response.postProcessingAttempted()).isEqualTo(2);
+        assertThat(response.metadataTranslationSucceeded()).isEqualTo(1);
+        assertThat(response.metadataTranslationFailed()).isEqualTo(1);
+        assertThat(response.contentExtractionSucceeded()).isEqualTo(1);
+        assertThat(response.contentExtractionFailed()).isEqualTo(1);
+        assertThat(response.contentTranslationSucceeded()).isEqualTo(1);
+        assertThat(response.contentTranslationFailed()).isZero();
+        verify(postProcessingService).process(firstSaved);
+        verify(postProcessingService).process(secondSaved);
     }
 
     @Test
@@ -257,7 +323,8 @@ class WatchlistDiscoveryServiceTest {
                 new NewsDiscoveryQueryFactory(Clock.fixed(NOW, ZoneOffset.UTC)),
                 new DiscoveryKeywordMatcher(),
                 new DiscoveryUrlNormalizer(),
-                persistenceService
+                persistenceService,
+                postProcessingService
         );
     }
 
@@ -286,5 +353,27 @@ class WatchlistDiscoveryServiceTest {
 
     private DiscoveredArticle article(String title, String url) {
         return new DiscoveredArticle(title, url, null, "Example", null, "en");
+    }
+
+    private Article article(Long id) {
+        Source source = new Source(
+                "Example",
+                "https://example.com",
+                SourceType.WEBSITE,
+                SourcePriority.MEDIUM,
+                SourceLanguage.EN
+        );
+        Article article = new Article(
+                "Persisted article",
+                "https://example.com/" + id,
+                source,
+                NOW
+        );
+        ReflectionTestUtils.setField(article, "id", id);
+        return article;
+    }
+
+    private ArticlePostProcessingResult successfulPostProcessing() {
+        return new ArticlePostProcessingResult(true, false, true, false, true, false);
     }
 }

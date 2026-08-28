@@ -1,5 +1,7 @@
 package com.carya.energynews.watchlistdiscovery;
 
+import com.carya.energynews.article.ArticlePostProcessingResult;
+import com.carya.energynews.article.ArticlePostProcessingService;
 import com.carya.energynews.discovery.DiscoveredArticle;
 import com.carya.energynews.discovery.NewsDiscoveryException;
 import com.carya.energynews.discovery.NewsDiscoveryQuery;
@@ -30,6 +32,7 @@ public class WatchlistDiscoveryService {
     private final DiscoveryKeywordMatcher keywordMatcher;
     private final DiscoveryUrlNormalizer urlNormalizer;
     private final WatchlistDiscoveryPersistenceService persistenceService;
+    private final ArticlePostProcessingService postProcessingService;
 
     public WatchlistDiscoveryService(
             WatchlistRepository watchlistRepository,
@@ -37,7 +40,8 @@ public class WatchlistDiscoveryService {
             NewsDiscoveryQueryFactory queryFactory,
             DiscoveryKeywordMatcher keywordMatcher,
             DiscoveryUrlNormalizer urlNormalizer,
-            WatchlistDiscoveryPersistenceService persistenceService
+            WatchlistDiscoveryPersistenceService persistenceService,
+            ArticlePostProcessingService postProcessingService
     ) {
         this.watchlistRepository = watchlistRepository;
         this.discoveryService = discoveryService;
@@ -45,6 +49,7 @@ public class WatchlistDiscoveryService {
         this.keywordMatcher = keywordMatcher;
         this.urlNormalizer = urlNormalizer;
         this.persistenceService = persistenceService;
+        this.postProcessingService = postProcessingService;
     }
 
     public WatchlistDiscoveryRunResponse run(WatchlistDiscoveryRunRequest request) {
@@ -150,7 +155,10 @@ public class WatchlistDiscoveryService {
 
         articleIdsByUrl.put(normalizedUrl.get(), result.articleId());
         switch (result.status()) {
-            case SAVED -> counters.saved++;
+            case SAVED -> {
+                counters.saved++;
+                counters.addPostProcessing(postProcessingService.process(result.article()));
+            }
             case DUPLICATE -> counters.duplicates++;
             case SKIPPED_UNSUPPORTED_LANGUAGE -> throw new IllegalStateException(
                     "Unsupported language result must be handled before ingestion counters"
@@ -189,6 +197,13 @@ public class WatchlistDiscoveryService {
                 0,
                 0,
                 0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
                 List.of(),
                 List.of()
         );
@@ -205,10 +220,27 @@ public class WatchlistDiscoveryService {
         private int keywordMatchesExisting;
         private int skippedUnsupportedLanguage;
         private int skippedInvalidUrl;
+        private int postProcessingAttempted;
+        private int metadataTranslationSucceeded;
+        private int metadataTranslationFailed;
+        private int contentExtractionSucceeded;
+        private int contentExtractionFailed;
+        private int contentTranslationSucceeded;
+        private int contentTranslationFailed;
         private String failure;
 
         private KeywordCounters(Keyword keyword) {
             this.keyword = keyword;
+        }
+
+        private void addPostProcessing(ArticlePostProcessingResult result) {
+            postProcessingAttempted++;
+            metadataTranslationSucceeded += result.metadataTranslationSucceeded() ? 1 : 0;
+            metadataTranslationFailed += result.metadataTranslationFailed() ? 1 : 0;
+            contentExtractionSucceeded += result.contentExtractionSucceeded() ? 1 : 0;
+            contentExtractionFailed += result.contentExtractionFailed() ? 1 : 0;
+            contentTranslationSucceeded += result.contentTranslationSucceeded() ? 1 : 0;
+            contentTranslationFailed += result.contentTranslationFailed() ? 1 : 0;
         }
 
         private WatchlistDiscoveryKeywordResult toResult() {
@@ -240,6 +272,13 @@ public class WatchlistDiscoveryService {
         private int keywordMatchesExisting;
         private int skippedUnsupportedLanguage;
         private int skippedInvalidUrl;
+        private int postProcessingAttempted;
+        private int metadataTranslationSucceeded;
+        private int metadataTranslationFailed;
+        private int contentExtractionSucceeded;
+        private int contentExtractionFailed;
+        private int contentTranslationSucceeded;
+        private int contentTranslationFailed;
 
         private void add(KeywordCounters counters) {
             discovered += counters.discovered;
@@ -250,6 +289,13 @@ public class WatchlistDiscoveryService {
             keywordMatchesExisting += counters.keywordMatchesExisting;
             skippedUnsupportedLanguage += counters.skippedUnsupportedLanguage;
             skippedInvalidUrl += counters.skippedInvalidUrl;
+            postProcessingAttempted += counters.postProcessingAttempted;
+            metadataTranslationSucceeded += counters.metadataTranslationSucceeded;
+            metadataTranslationFailed += counters.metadataTranslationFailed;
+            contentExtractionSucceeded += counters.contentExtractionSucceeded;
+            contentExtractionFailed += counters.contentExtractionFailed;
+            contentTranslationSucceeded += counters.contentTranslationSucceeded;
+            contentTranslationFailed += counters.contentTranslationFailed;
         }
 
         private WatchlistDiscoveryRunResponse toResponse(
@@ -270,6 +316,13 @@ public class WatchlistDiscoveryService {
                     keywordMatchesExisting,
                     skippedUnsupportedLanguage,
                     skippedInvalidUrl,
+                    postProcessingAttempted,
+                    metadataTranslationSucceeded,
+                    metadataTranslationFailed,
+                    contentExtractionSucceeded,
+                    contentExtractionFailed,
+                    contentTranslationSucceeded,
+                    contentTranslationFailed,
                     List.copyOf(failures),
                     List.copyOf(keywordResults)
             );

@@ -15,6 +15,13 @@ public record WatchlistDiscoveryRunResponse(
         int keywordMatchesExisting,
         int skippedUnsupportedLanguage,
         int skippedInvalidUrl,
+        int postProcessingAttempted,
+        int metadataTranslationSucceeded,
+        int metadataTranslationFailed,
+        int contentExtractionSucceeded,
+        int contentExtractionFailed,
+        int contentTranslationSucceeded,
+        int contentTranslationFailed,
         List<WatchlistDiscoveryKeywordFailure> failedKeywords,
         List<WatchlistDiscoveryKeywordResult> keywordResults
 ) {

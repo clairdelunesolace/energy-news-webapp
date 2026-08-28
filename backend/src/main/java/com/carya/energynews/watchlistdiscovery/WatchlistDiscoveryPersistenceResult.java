@@ -1,8 +1,10 @@
 package com.carya.energynews.watchlistdiscovery;
 
+import com.carya.energynews.article.Article;
+
 public record WatchlistDiscoveryPersistenceResult(
         Status status,
-        Long articleId,
+        Article article,
         boolean keywordMatchCreated
 ) {
 
@@ -12,6 +14,10 @@ public record WatchlistDiscoveryPersistenceResult(
                 null,
                 false
         );
+    }
+
+    public Long articleId() {
+        return article == null ? null : article.getId();
     }
 
     public enum Status {

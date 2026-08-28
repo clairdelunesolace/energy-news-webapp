@@ -63,7 +63,7 @@ public class WatchlistDiscoveryPersistenceService {
         };
         return new WatchlistDiscoveryPersistenceResult(
                 status,
-                ingestion.article().getId(),
+                ingestion.article(),
                 matchCreated
         );
     }

@@ -79,6 +79,7 @@ class WatchlistDiscoveryPersistenceServiceTest {
         assertThat(first.status()).isEqualTo(
                 WatchlistDiscoveryPersistenceResult.Status.SAVED
         );
+        assertThat(first.article()).isNotNull();
         assertThat(first.keywordMatchCreated()).isTrue();
         assertThat(second.status()).isEqualTo(
                 WatchlistDiscoveryPersistenceResult.Status.DUPLICATE
