@@ -13,16 +13,20 @@ import com.carya.energynews.watchlist.WatchlistNotFoundException;
 import com.carya.energynews.watchlist.WatchlistRepository;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 
 @Service
 public class WatchlistDiscoveryService {
 
+    private static final String UNEXPECTED_FAILURE = "Unexpected processing failure";
     private static final Comparator<Keyword> KEYWORD_ORDER = Comparator
             .comparing(Keyword::getId, Comparator.nullsLast(Long::compareTo));
 
@@ -60,12 +64,79 @@ public class WatchlistDiscoveryService {
             throw new WatchlistDisabledException(watchlist.getId());
         }
 
+        return execute(
+                watchlist,
+                keyword -> queryFactory.create(
+                        keyword.getKeyword(),
+                        request.from(),
+                        request.to(),
+                        request.limitPerKeyword()
+                ),
+                DiscoveryRequestPacer.noDelay(),
+                new DiscoveryRequestBudget(Integer.MAX_VALUE)
+        ).response();
+    }
+
+    public boolean isProviderAvailable() {
+        return discoveryService.isPresent();
+    }
+
+    WatchlistDiscoveryExecutionResult runScheduled(
+            Long watchlistId,
+            Instant from,
+            Instant to,
+            int limitPerKeyword,
+            DiscoveryRequestPacer pacer,
+            DiscoveryRequestBudget requestBudget
+    ) {
+        Objects.requireNonNull(from, "Scheduled discovery start time is required");
+        Objects.requireNonNull(to, "Scheduled discovery end time is required");
+        Objects.requireNonNull(pacer, "Discovery request pacer is required");
+        Objects.requireNonNull(requestBudget, "Discovery request budget is required");
+        if (from.isAfter(to)) {
+            throw new IllegalArgumentException(
+                    "Scheduled discovery start time must not be after end time"
+            );
+        }
+
+        Watchlist watchlist = watchlistRepository.findWithKeywordsById(watchlistId)
+                .orElseThrow(() -> new WatchlistNotFoundException(watchlistId));
+        if (!watchlist.isEnabled()) {
+            throw new WatchlistDisabledException(watchlist.getId());
+        }
+
+        return execute(
+                watchlist,
+                keyword -> queryFactory.create(
+                        keyword.getKeyword(),
+                        from,
+                        to,
+                        limitPerKeyword
+                ),
+                pacer,
+                requestBudget
+        );
+    }
+
+    private WatchlistDiscoveryExecutionResult execute(
+            Watchlist watchlist,
+            Function<Keyword, NewsDiscoveryQuery> queryFactory,
+            DiscoveryRequestPacer pacer,
+            DiscoveryRequestBudget requestBudget
+    ) {
+
         List<Keyword> keywords = watchlist.getKeywords().stream()
                 .filter(Keyword::isEnabled)
                 .sorted(KEYWORD_ORDER)
                 .toList();
         if (keywords.isEmpty()) {
-            return emptyResponse(watchlist);
+            return new WatchlistDiscoveryExecutionResult(emptyResponse(watchlist), 0);
+        }
+        if (requestBudget.remaining() == 0) {
+            return new WatchlistDiscoveryExecutionResult(
+                    emptyResponse(watchlist),
+                    keywords.size()
+            );
         }
 
         NewsDiscoveryService service = discoveryService.orElseThrow(
@@ -75,16 +146,19 @@ public class WatchlistDiscoveryService {
         Map<String, Long> articleIdsByUrl = new HashMap<>();
         List<WatchlistDiscoveryKeywordFailure> failures = new ArrayList<>();
         List<WatchlistDiscoveryKeywordResult> keywordResults = new ArrayList<>();
+        int keywordsSkippedByRequestLimit = 0;
 
-        for (Keyword keyword : keywords) {
+        for (int index = 0; index < keywords.size(); index++) {
+            Keyword keyword = keywords.get(index);
+            NewsDiscoveryQuery query = queryFactory.apply(keyword);
+            if (!requestBudget.tryAcquire()) {
+                keywordsSkippedByRequestLimit = keywords.size() - index;
+                break;
+            }
+
             KeywordCounters counters = new KeywordCounters(keyword);
             try {
-                NewsDiscoveryQuery query = queryFactory.create(
-                        keyword.getKeyword(),
-                        request.from(),
-                        request.to(),
-                        request.limitPerKeyword()
-                );
+                pacer.awaitNextRequest();
                 List<DiscoveredArticle> discovered = service.discover(query);
                 counters.discovered = discovered.size();
                 for (DiscoveredArticle article : discovered) {
@@ -104,12 +178,32 @@ public class WatchlistDiscoveryService {
                         keyword.getKeyword(),
                         exception.getMessage()
                 ));
+            } catch (RuntimeException exception) {
+                totals.keywordsFailed++;
+                counters.failure = UNEXPECTED_FAILURE;
+                failures.add(new WatchlistDiscoveryKeywordFailure(
+                        keyword.getId(),
+                        keyword.getKeyword(),
+                        UNEXPECTED_FAILURE
+                ));
+                totals.add(counters);
+                keywordResults.add(counters.toResult());
+                throw new WatchlistDiscoveryExecutionException(
+                        exception,
+                        new WatchlistDiscoveryExecutionResult(
+                                totals.toResponse(watchlist, failures, keywordResults),
+                                0
+                        )
+                );
             }
             totals.add(counters);
             keywordResults.add(counters.toResult());
         }
 
-        return totals.toResponse(watchlist, failures, keywordResults);
+        return new WatchlistDiscoveryExecutionResult(
+                totals.toResponse(watchlist, failures, keywordResults),
+                keywordsSkippedByRequestLimit
+        );
     }
 
     private void processCandidate(
@@ -154,9 +248,11 @@ public class WatchlistDiscoveryService {
         }
 
         articleIdsByUrl.put(normalizedUrl.get(), result.articleId());
+        countMatch(result.keywordMatchCreated(), counters);
         switch (result.status()) {
             case SAVED -> {
                 counters.saved++;
+                counters.postProcessingAttempted++;
                 counters.addPostProcessing(postProcessingService.process(result.article()));
             }
             case DUPLICATE -> counters.duplicates++;
@@ -164,7 +260,6 @@ public class WatchlistDiscoveryService {
                     "Unsupported language result must be handled before ingestion counters"
             );
         }
-        countMatch(result.keywordMatchCreated(), counters);
     }
 
     private void countMatch(boolean created, KeywordCounters counters) {
@@ -234,7 +329,6 @@ public class WatchlistDiscoveryService {
         }
 
         private void addPostProcessing(ArticlePostProcessingResult result) {
-            postProcessingAttempted++;
             metadataTranslationSucceeded += result.metadataTranslationSucceeded() ? 1 : 0;
             metadataTranslationFailed += result.metadataTranslationFailed() ? 1 : 0;
             contentExtractionSucceeded += result.contentExtractionSucceeded() ? 1 : 0;

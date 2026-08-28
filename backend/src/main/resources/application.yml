@@ -20,6 +20,14 @@ server:
 app:
   discovery:
     provider: ${NEWS_DISCOVERY_PROVIDER:none}
+    scheduler:
+      enabled: ${NEWS_DISCOVERY_SCHEDULER_ENABLED:false}
+      cron: "${NEWS_DISCOVERY_SCHEDULER_CRON:0 30 20 * * *}"
+      zone: "${NEWS_DISCOVERY_SCHEDULER_ZONE:Asia/Shanghai}"
+      lookback-hours: ${NEWS_DISCOVERY_LOOKBACK_HOURS:36}
+      limit-per-keyword: ${NEWS_DISCOVERY_LIMIT_PER_KEYWORD:5}
+      delay-between-keywords-ms: ${NEWS_DISCOVERY_KEYWORD_DELAY_MS:10000}
+      max-requests-per-run: ${NEWS_DISCOVERY_MAX_REQUESTS_PER_RUN:20}
     brave:
       api-key: "${BRAVE_SEARCH_API_KEY:}"
     gnews:

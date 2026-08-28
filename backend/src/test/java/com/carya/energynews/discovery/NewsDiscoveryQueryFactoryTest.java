@@ -50,4 +50,15 @@ class NewsDiscoveryQueryFactoryTest {
         assertThat(current.to()).isEqualTo(NOW);
         assertThat(future.to()).isEqualTo(NOW);
     }
+
+    @Test
+    void preservesPreciseInstantBoundsForScheduledDiscovery() {
+        Instant from = Instant.parse("2026-08-25T22:15:30Z");
+
+        NewsDiscoveryQuery query = factory.create("BESS", from, NOW, 5);
+
+        assertThat(query.from()).isEqualTo(from);
+        assertThat(query.to()).isEqualTo(NOW);
+        assertThat(query.limit()).isEqualTo(5);
+    }
 }

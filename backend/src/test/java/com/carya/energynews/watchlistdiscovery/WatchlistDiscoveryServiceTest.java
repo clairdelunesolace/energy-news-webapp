@@ -20,6 +20,7 @@ import com.carya.energynews.watchlist.WatchlistRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -35,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -56,6 +58,9 @@ class WatchlistDiscoveryServiceTest {
 
     @Mock
     private ArticlePostProcessingService postProcessingService;
+
+    @Mock
+    private DiscoveryRequestPacer scheduledRequestPacer;
 
     private WatchlistDiscoveryService service;
 
@@ -298,6 +303,52 @@ class WatchlistDiscoveryServiceTest {
     }
 
     @Test
+    void scheduledUnexpectedFailureCarriesAlreadyCommittedCounters() {
+        Watchlist watchlist = watchlist(1L, "Partial", true);
+        Keyword keyword = keyword(watchlist, 11L, "NVIDIA", true);
+        when(watchlistRepository.findWithKeywordsById(1L)).thenReturn(Optional.of(watchlist));
+        DiscoveredArticle discovered = article(
+                "NVIDIA infrastructure update",
+                "https://example.com/partial"
+        );
+        when(newsDiscoveryProvider.discover(any(NewsDiscoveryQuery.class)))
+                .thenReturn(List.of(discovered));
+        Article savedArticle = article(301L);
+        when(persistenceService.ingestAndMatch(
+                discovered,
+                discovered.url(),
+                keyword.getId()
+        )).thenReturn(new WatchlistDiscoveryPersistenceResult(
+                WatchlistDiscoveryPersistenceResult.Status.SAVED,
+                savedArticle,
+                true
+        ));
+        when(postProcessingService.process(savedArticle))
+                .thenThrow(new IllegalStateException("unexpected"));
+
+        assertThatThrownBy(() -> service.runScheduled(
+                1L,
+                NOW.minusSeconds(36 * 60 * 60),
+                NOW,
+                5,
+                scheduledRequestPacer,
+                new DiscoveryRequestBudget(10)
+        )).isInstanceOfSatisfying(
+                WatchlistDiscoveryExecutionException.class,
+                exception -> {
+                    WatchlistDiscoveryRunResponse partial = exception
+                            .partialResult()
+                            .response();
+                    assertThat(partial.keywordsProcessed()).isZero();
+                    assertThat(partial.keywordsFailed()).isEqualTo(1);
+                    assertThat(partial.saved()).isEqualTo(1);
+                    assertThat(partial.keywordMatchesCreated()).isEqualTo(1);
+                    assertThat(partial.postProcessingAttempted()).isEqualTo(1);
+                }
+        );
+    }
+
+    @Test
     void rejectsInvalidDateRangeAndUnavailableProviderClearly() {
         assertThatThrownBy(() -> service.run(request(
                 1L,
@@ -314,6 +365,68 @@ class WatchlistDiscoveryServiceTest {
         assertThatThrownBy(() -> service(Optional.empty()).run(request(1L, null, null, 10)))
                 .isInstanceOf(WatchlistDiscoveryProviderUnavailableException.class)
                 .hasMessage("News discovery provider is not configured.");
+    }
+
+    @Test
+    void scheduledRunUsesPreciseWindowPacingAndGlobalRequestBudget() {
+        Watchlist watchlist = watchlist(1L, "Scheduled", true);
+        keyword(watchlist, 11L, "battery", true);
+        keyword(watchlist, 12L, "disabled", false);
+        Keyword nvidia = keyword(watchlist, 13L, "NVIDIA", true);
+        keyword(watchlist, 14L, "solar", true);
+        when(watchlistRepository.findWithKeywordsById(1L)).thenReturn(Optional.of(watchlist));
+
+        Instant from = Instant.parse("2026-08-26T16:00:00Z");
+        NewsDiscoveryQuery batteryQuery = new NewsDiscoveryQuery("battery", from, NOW, 5);
+        NewsDiscoveryQuery nvidiaQuery = new NewsDiscoveryQuery("NVIDIA", from, NOW, 5);
+        when(newsDiscoveryProvider.discover(batteryQuery))
+                .thenThrow(new NewsDiscoveryException("gnews was rate limited"));
+        DiscoveredArticle duplicate = article(
+                "NVIDIA data center platform",
+                "https://example.com/nvidia"
+        );
+        when(newsDiscoveryProvider.discover(nvidiaQuery)).thenReturn(List.of(duplicate));
+        when(persistenceService.ingestAndMatch(
+                duplicate,
+                duplicate.url(),
+                nvidia.getId()
+        )).thenReturn(new WatchlistDiscoveryPersistenceResult(
+                WatchlistDiscoveryPersistenceResult.Status.DUPLICATE,
+                article(201L),
+                false
+        ));
+        DiscoveryRequestBudget requestBudget = new DiscoveryRequestBudget(2);
+
+        WatchlistDiscoveryExecutionResult execution = service.runScheduled(
+                1L,
+                from,
+                NOW,
+                5,
+                scheduledRequestPacer,
+                requestBudget
+        );
+
+        assertThat(execution.response().keywordsProcessed()).isEqualTo(1);
+        assertThat(execution.response().keywordsFailed()).isEqualTo(1);
+        assertThat(execution.response().duplicates()).isEqualTo(1);
+        assertThat(execution.response().postProcessingAttempted()).isZero();
+        assertThat(execution.keywordsSkippedByRequestLimit()).isEqualTo(1);
+        assertThat(requestBudget.remaining()).isZero();
+        assertThat(execution.response().failedKeywords()).containsExactly(
+                new WatchlistDiscoveryKeywordFailure(
+                        11L,
+                        "battery",
+                        "gnews was rate limited"
+                )
+        );
+
+        InOrder callOrder = inOrder(scheduledRequestPacer, newsDiscoveryProvider);
+        callOrder.verify(scheduledRequestPacer).awaitNextRequest();
+        callOrder.verify(newsDiscoveryProvider).discover(batteryQuery);
+        callOrder.verify(scheduledRequestPacer).awaitNextRequest();
+        callOrder.verify(newsDiscoveryProvider).discover(nvidiaQuery);
+        verify(newsDiscoveryProvider, times(2)).discover(any(NewsDiscoveryQuery.class));
+        verifyNoInteractions(postProcessingService);
     }
 
     private WatchlistDiscoveryService service(Optional<NewsDiscoveryService> provider) {

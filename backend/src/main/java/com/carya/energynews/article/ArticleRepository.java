@@ -20,6 +20,10 @@ public interface ArticleRepository extends JpaRepository<Article, Long> {
     @EntityGraph(attributePaths = "source")
     Optional<Article> findByUrl(String url);
 
+    @EntityGraph(attributePaths = "source")
+    @Query("SELECT article FROM Article article WHERE article.id = :id")
+    Optional<Article> findWithSourceById(@Param("id") Long id);
+
     @Query(
             value = """
                     SELECT article

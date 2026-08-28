@@ -32,6 +32,15 @@ public class NewsDiscoveryQueryFactory {
         );
     }
 
+    public NewsDiscoveryQuery create(
+            String keyword,
+            Instant from,
+            Instant to,
+            int limit
+    ) {
+        return new NewsDiscoveryQuery(keyword, from, to, limit);
+    }
+
     private Instant startOfDate(LocalDate date) {
         return date == null ? null : date.atStartOfDay(ZoneOffset.UTC).toInstant();
     }

@@ -29,6 +29,10 @@ public class ArticleContentService {
         }
 
         article.setContent(content);
-        return articleRepository.saveAndFlush(article);
+        Article savedArticle = articleRepository.saveAndFlush(article);
+        return articleRepository.findWithSourceById(savedArticle.getId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "Saved Article could not be reloaded for post-processing"
+                ));
     }
 }

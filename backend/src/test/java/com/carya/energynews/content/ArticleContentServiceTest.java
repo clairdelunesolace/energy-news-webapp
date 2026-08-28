@@ -9,8 +9,10 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -49,12 +51,15 @@ class ArticleContentServiceTest {
                 .thenReturn("First paragraph.\n\nSecond paragraph.");
         when(articleRepository.saveAndFlush(any(Article.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+        when(articleRepository.findWithSourceById(article.getId()))
+                .thenReturn(Optional.of(article));
 
         Article result = service().enrichContent(article);
 
         assertThat(result.getContent()).isEqualTo("First paragraph.\n\nSecond paragraph.");
         verify(articleContentFetcher).fetchContent(article);
         verify(articleRepository).saveAndFlush(article);
+        verify(articleRepository).findWithSourceById(article.getId());
     }
 
     @Test
@@ -80,11 +85,13 @@ class ArticleContentServiceTest {
                 SourceType.RSS,
                 SourcePriority.MEDIUM
         );
-        return new Article(
+        Article article = new Article(
                 "Test article",
                 "https://example.com/articles/" + suffix,
                 source,
                 Instant.parse("2026-08-20T00:00:00Z")
         );
+        ReflectionTestUtils.setField(article, "id", 1L);
+        return article;
     }
 }
