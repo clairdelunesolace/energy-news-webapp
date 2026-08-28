@@ -26,7 +26,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(NewsDiscoveryPreviewController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import(NewsDiscoveryPreviewControllerTest.FixedClockConfiguration.class)
+@Import({
+        NewsDiscoveryQueryFactory.class,
+        NewsDiscoveryPreviewControllerTest.FixedClockConfiguration.class
+})
 class NewsDiscoveryPreviewControllerTest {
 
     private static final Instant NOW = Instant.parse("2026-08-27T10:15:30Z");

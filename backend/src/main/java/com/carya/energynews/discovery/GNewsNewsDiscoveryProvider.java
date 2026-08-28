@@ -221,7 +221,8 @@ public class GNewsNewsDiscoveryProvider implements NewsDiscoveryProvider {
                 article.url(),
                 optionalText(article.description()),
                 article.source() == null ? null : optionalText(article.source().name()),
-                parseInstant(article.publishedAt())
+                parseInstant(article.publishedAt()),
+                optionalText(article.lang())
         );
     }
 
@@ -294,6 +295,7 @@ public class GNewsNewsDiscoveryProvider implements NewsDiscoveryProvider {
             String url,
             String description,
             String publishedAt,
+            String lang,
             GNewsSource source
     ) {
     }

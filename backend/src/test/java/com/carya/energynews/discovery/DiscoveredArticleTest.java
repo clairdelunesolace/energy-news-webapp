@@ -21,7 +21,8 @@ class DiscoveredArticleTest {
                 "  https://example.com/grid-battery  ",
                 "Project description",
                 "Example News",
-                publishedAt
+                publishedAt,
+                " en "
         );
 
         assertThat(article.title()).isEqualTo("Grid battery project announced");
@@ -29,6 +30,7 @@ class DiscoveredArticleTest {
         assertThat(article.description()).isEqualTo("Project description");
         assertThat(article.sourceName()).isEqualTo("Example News");
         assertThat(article.publishedAt()).isEqualTo(publishedAt);
+        assertThat(article.languageCode()).isEqualTo("en");
     }
 
     @Test
@@ -44,6 +46,7 @@ class DiscoveredArticleTest {
         assertThat(article.description()).isNull();
         assertThat(article.sourceName()).isNull();
         assertThat(article.publishedAt()).isNull();
+        assertThat(article.languageCode()).isNull();
     }
 
     @ParameterizedTest

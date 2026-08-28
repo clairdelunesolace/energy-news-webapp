@@ -7,12 +7,24 @@ public record DiscoveredArticle(
         String url,
         String description,
         String sourceName,
-        Instant publishedAt
+        Instant publishedAt,
+        String languageCode
 ) {
+
+    public DiscoveredArticle(
+            String title,
+            String url,
+            String description,
+            String sourceName,
+            Instant publishedAt
+    ) {
+        this(title, url, description, sourceName, publishedAt, null);
+    }
 
     public DiscoveredArticle {
         title = requiredText(title, "Discovered article title is required");
         url = requiredText(url, "Discovered article URL is required");
+        languageCode = optionalText(languageCode);
     }
 
     private static String requiredText(String value, String message) {
@@ -24,5 +36,13 @@ public record DiscoveredArticle(
             throw new IllegalArgumentException(message);
         }
         return normalized;
+    }
+
+    private static String optionalText(String value) {
+        if (value == null) {
+            return null;
+        }
+        String normalized = value.strip();
+        return normalized.isBlank() ? null : normalized;
     }
 }

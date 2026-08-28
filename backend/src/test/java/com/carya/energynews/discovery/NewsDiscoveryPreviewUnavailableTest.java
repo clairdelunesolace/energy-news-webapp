@@ -19,7 +19,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(NewsDiscoveryPreviewController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, NewsDiscoveryQueryFactory.class})
 @TestPropertySource(properties = {
         "app.security.admin.username=configured-admin",
         "app.security.admin.password=test-password"

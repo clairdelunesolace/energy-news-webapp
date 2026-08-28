@@ -5,13 +5,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.Clock;
-import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalTime;
-import java.time.ZoneOffset;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 
 @RestController
@@ -19,14 +14,14 @@ import java.util.Optional;
 public class NewsDiscoveryPreviewController {
 
     private final Optional<NewsDiscoveryService> discoveryService;
-    private final Clock clock;
+    private final NewsDiscoveryQueryFactory queryFactory;
 
     public NewsDiscoveryPreviewController(
             Optional<NewsDiscoveryService> discoveryService,
-            Clock clock
+            NewsDiscoveryQueryFactory queryFactory
     ) {
         this.discoveryService = discoveryService;
-        this.clock = Objects.requireNonNull(clock, "Discovery clock is required");
+        this.queryFactory = queryFactory;
     }
 
     @GetMapping("/preview")
@@ -41,12 +36,7 @@ public class NewsDiscoveryPreviewController {
                         "News discovery provider is not configured."
                 )
         );
-        NewsDiscoveryQuery query = new NewsDiscoveryQuery(
-                keyword,
-                startOfDate(from),
-                endOfDate(to),
-                limit
-        );
+        NewsDiscoveryQuery query = queryFactory.create(keyword, from, to, limit);
         List<DiscoveredArticle> results = service.discover(query);
         return new NewsDiscoveryPreviewResponse(
                 service.providerName(),
@@ -54,22 +44,5 @@ public class NewsDiscoveryPreviewController {
                 results.size(),
                 results
         );
-    }
-
-    private Instant startOfDate(LocalDate date) {
-        return date == null ? null : date.atStartOfDay(ZoneOffset.UTC).toInstant();
-    }
-
-    private Instant endOfDate(LocalDate date) {
-        if (date == null) {
-            return null;
-        }
-
-        Instant now = clock.instant();
-        LocalDate currentUtcDate = LocalDate.ofInstant(now, ZoneOffset.UTC);
-        if (!date.isBefore(currentUtcDate)) {
-            return now;
-        }
-        return date.atTime(LocalTime.MAX).toInstant(ZoneOffset.UTC);
     }
 }

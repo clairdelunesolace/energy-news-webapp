@@ -70,6 +70,7 @@ class GNewsNewsDiscoveryProviderTest {
                     "description": "  A utility-scale project.  ",
                     "content": "This provider content must not be mapped.",
                     "publishedAt": "2026-08-26T10:15:30Z",
+                    "lang": "en",
                     "source": {
                       "name": "  Example Energy News  ",
                       "url": "https://news.example.com",
@@ -93,7 +94,8 @@ class GNewsNewsDiscoveryProviderTest {
                 "https://news.example.com/grid-battery",
                 "A utility-scale project.",
                 "Example Energy News",
-                Instant.parse("2026-08-26T10:15:30Z")
+                Instant.parse("2026-08-26T10:15:30Z"),
+                "en"
         ));
         assertThat(requests).hasSize(1);
         RecordedRequest request = requests.getFirst();
