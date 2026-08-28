@@ -24,6 +24,9 @@ public interface ArticleRepository extends JpaRepository<Article, Long> {
     @Query("SELECT article FROM Article article WHERE article.id = :id")
     Optional<Article> findWithSourceById(@Param("id") Long id);
 
+    @EntityGraph(attributePaths = "source")
+    List<Article> findAllByIdIn(List<Long> ids);
+
     @Query(
             value = """
                     SELECT article
