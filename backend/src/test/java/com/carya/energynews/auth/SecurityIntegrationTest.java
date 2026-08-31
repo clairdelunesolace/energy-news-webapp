@@ -140,7 +140,7 @@ class SecurityIntegrationTest {
 
     @Test
     void correctPasswordEstablishesSessionThatCanAccessProtectedEndpoints() throws Exception {
-        when(articleService.getAll(anyInt(), anyInt(), isNull(), isNull()))
+        when(articleService.getAll(anyInt(), anyInt(), isNull(), isNull(), isNull()))
                 .thenReturn(emptyArticlePage());
         CsrfValues csrf = getCsrf(null);
 

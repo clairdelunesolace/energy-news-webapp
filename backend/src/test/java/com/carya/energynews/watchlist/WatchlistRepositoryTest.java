@@ -1,5 +1,6 @@
 package com.carya.energynews.watchlist;
 
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -16,6 +17,30 @@ class WatchlistRepositoryTest {
 
     @Autowired
     private KeywordRepository keywordRepository;
+
+    @Autowired
+    private EntityManager entityManager;
+
+    @Test
+    void loadsAllWatchlistsWithKeywordsWithoutLazyCollectionQueries() {
+        Watchlist topics = new Watchlist("Topics");
+        topics.addKeyword("grid storage");
+        topics.addKeyword("long duration").setEnabled(false);
+        Watchlist empty = new Watchlist("Empty");
+        empty.setEnabled(false);
+        watchlistRepository.saveAndFlush(topics);
+        watchlistRepository.saveAndFlush(empty);
+        entityManager.clear();
+
+        var results = watchlistRepository.findAll();
+
+        assertThat(results).extracting(Watchlist::getId).containsExactlyInAnyOrder(topics.getId(), empty.getId());
+        assertThat(results).allSatisfy(watchlist ->
+                assertThat(entityManager.getEntityManagerFactory().getPersistenceUnitUtil()
+                        .isLoaded(watchlist, "keywords")).isTrue());
+        assertThat(results.stream().filter(watchlist -> watchlist.getId().equals(topics.getId()))
+                .findFirst().orElseThrow().getKeywords()).hasSize(2);
+    }
 
     @Test
     void persistsDefaultsTrimmedValuesAndTimestamps() {

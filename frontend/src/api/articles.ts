@@ -6,6 +6,7 @@ export interface GetArticlesParams {
   size?: number
   sourceId?: number
   keyword?: string
+  keywordId?: number
 }
 
 export function getArticles(
@@ -18,6 +19,7 @@ export function getArticles(
   if (params.size !== undefined) searchParams.set('size', String(params.size))
   if (params.sourceId !== undefined) searchParams.set('sourceId', String(params.sourceId))
   if (params.keyword !== undefined) searchParams.set('keyword', params.keyword)
+  if (params.keywordId !== undefined) searchParams.set('keywordId', String(params.keywordId))
 
   const query = searchParams.toString()
   const url = query ? `/api/articles?${query}` : '/api/articles'

@@ -1,25 +1,25 @@
-import type { SourceResponse } from '../../types/sources'
+import type { WatchlistResponse } from '../../types/watchlists'
 
 interface FeedToolbarProps {
   keywordInput: string
   onKeywordInputChange: (value: string) => void
   onSearch: () => void
-  sources: SourceResponse[]
-  selectedSourceId: number | null
-  onSourceChange: (sourceId: number | null) => void
-  sourcesLoading: boolean
-  sourcesError: boolean
+  watchlists: WatchlistResponse[]
+  selectedKeywordId: number | null
+  onKeywordChange: (keywordId: number | null) => void
+  keywordsLoading: boolean
+  keywordsError: boolean
 }
 
 export function FeedToolbar({
   keywordInput,
   onKeywordInputChange,
   onSearch,
-  sources,
-  selectedSourceId,
-  onSourceChange,
-  sourcesLoading,
-  sourcesError,
+  watchlists,
+  selectedKeywordId,
+  onKeywordChange,
+  keywordsLoading,
+  keywordsError,
 }: FeedToolbarProps) {
   return (
     <form
@@ -41,23 +41,27 @@ export function FeedToolbar({
       </label>
 
       <label className="feed-toolbar__field">
-        <span className="feed-toolbar__label">来源</span>
+        <span className="feed-toolbar__label">关键词</span>
         <select
-          value={selectedSourceId ?? ''}
-          disabled={sourcesLoading}
+          value={selectedKeywordId ?? ''}
+          disabled={keywordsLoading}
           onChange={(event) => {
             const value = event.target.value
-            onSourceChange(value ? Number(value) : null)
+            onKeywordChange(value ? Number(value) : null)
           }}
         >
-          <option value="">全部来源</option>
-          {sources.map((source) => (
-            <option key={source.id} value={source.id}>
-              {source.name}
-            </option>
+          <option value="">全部关键词</option>
+          {watchlists.map((watchlist) => (
+            <optgroup key={watchlist.id} label={watchlist.name}>
+              {watchlist.keywords.map((keyword) => (
+                <option key={keyword.id} value={keyword.id}>
+                  {keyword.keyword}
+                </option>
+              ))}
+            </optgroup>
           ))}
         </select>
-        {sourcesError && <span className="feed-toolbar__note">来源列表加载失败</span>}
+        {keywordsError && <span className="feed-toolbar__note">关键词列表加载失败</span>}
       </label>
 
       <button className="button button--primary feed-toolbar__submit" type="submit">

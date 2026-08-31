@@ -57,7 +57,7 @@ class ArticleServiceTest {
         translation.setContent("中文完整正文");
         translation.setContentStatus(ContentTranslationStatus.SUCCESS);
         PageRequest pageRequest = PageRequest.of(0, 20);
-        when(articleRepository.findAllFiltered(null, "", pageRequest))
+        when(articleRepository.findAllFiltered(null, "", null, pageRequest))
                 .thenReturn(new PageImpl<>(List.of(article), pageRequest, 1));
         when(articleTranslationRepository.findAllByArticleIdInAndLanguageAndStatus(
                 List.of(1L),
@@ -65,7 +65,7 @@ class ArticleServiceTest {
                 TranslationStatus.SUCCESS
         )).thenReturn(List.of(translation));
 
-        ArticlePageResponse page = articleService.getAll(0, 20, null, null);
+        ArticlePageResponse page = articleService.getAll(0, 20, null, null, null);
 
         assertThat(page.content()).singleElement().satisfies(response -> {
             assertThat(response.id()).isEqualTo(1L);
@@ -83,7 +83,7 @@ class ArticleServiceTest {
                     "中文完整正文"
             ));
         });
-        verify(articleRepository).findAllFiltered(null, "", pageRequest);
+        verify(articleRepository).findAllFiltered(null, "", null, pageRequest);
         verify(articleTranslationRepository).findAllByArticleIdInAndLanguageAndStatus(
                 List.of(1L),
                 TranslationLanguage.ZH_CN,
@@ -100,10 +100,10 @@ class ArticleServiceTest {
     @Test
     void returnsRequestedPageMetadataAndSkipsTranslationLookupForEmptyPage() {
         PageRequest pageRequest = PageRequest.of(2, 5);
-        when(articleRepository.findAllFiltered(null, "", pageRequest))
+        when(articleRepository.findAllFiltered(null, "", null, pageRequest))
                 .thenReturn(new PageImpl<>(List.of(), pageRequest, 14));
 
-        ArticlePageResponse page = articleService.getAll(2, 5, null, null);
+        ArticlePageResponse page = articleService.getAll(2, 5, null, null, null);
 
         assertThat(page.content()).isEmpty();
         assertThat(page.page()).isEqualTo(2);
@@ -123,7 +123,7 @@ class ArticleServiceTest {
         ArticleTranslation pending = translation(pendingArticle, TranslationStatus.PENDING);
         ArticleTranslation failed = translation(failedArticle, TranslationStatus.FAILED);
         PageRequest pageRequest = PageRequest.of(0, 20);
-        when(articleRepository.findAllFiltered(null, "", pageRequest)).thenReturn(new PageImpl<>(
+        when(articleRepository.findAllFiltered(null, "", null, pageRequest)).thenReturn(new PageImpl<>(
                 List.of(missing, pendingArticle, failedArticle),
                 pageRequest,
                 3
@@ -134,7 +134,7 @@ class ArticleServiceTest {
                 TranslationStatus.SUCCESS
         )).thenReturn(List.of(pending, failed));
 
-        ArticlePageResponse page = articleService.getAll(0, 20, null, null);
+        ArticlePageResponse page = articleService.getAll(0, 20, null, null, null);
 
         assertThat(page.content())
                 .extracting(ArticleResponse::translation)
@@ -149,24 +149,54 @@ class ArticleServiceTest {
     @Test
     void treatsBlankKeywordAsNoKeywordFilter() {
         PageRequest pageRequest = PageRequest.of(0, 20);
-        when(articleRepository.findAllFiltered(3L, "", pageRequest))
+        when(articleRepository.findAllFiltered(3L, "", null, pageRequest))
                 .thenReturn(new PageImpl<>(List.of(), pageRequest, 0));
 
-        ArticlePageResponse page = articleService.getAll(0, 20, 3L, "   ");
+        ArticlePageResponse page = articleService.getAll(0, 20, 3L, "   ", null);
 
         assertThat(page.content()).isEmpty();
-        verify(articleRepository).findAllFiltered(3L, "", pageRequest);
+        verify(articleRepository).findAllFiltered(3L, "", null, pageRequest);
     }
 
     @Test
     void normalizesKeywordBeforeDatabaseFiltering() {
         PageRequest pageRequest = PageRequest.of(0, 20);
-        when(articleRepository.findAllFiltered(null, "battery", pageRequest))
+        when(articleRepository.findAllFiltered(null, "battery", null, pageRequest))
                 .thenReturn(new PageImpl<>(List.of(), pageRequest, 0));
 
-        articleService.getAll(0, 20, null, "  BaTtErY  ");
+        articleService.getAll(0, 20, null, "  BaTtErY  ", null);
 
-        verify(articleRepository).findAllFiltered(null, "battery", pageRequest);
+        verify(articleRepository).findAllFiltered(null, "battery", null, pageRequest);
+    }
+
+    @Test
+    void forwardsKeywordIdAlongsideNormalizedSearchAndKeepsBatchTranslations() {
+        Article article = article(SourceLanguage.EN);
+        PageRequest pageRequest = PageRequest.of(1, 1);
+        when(articleRepository.findAllFiltered(7L, "battery", 42L, pageRequest))
+                .thenReturn(new PageImpl<>(List.of(article), pageRequest, 3));
+
+        ArticlePageResponse page = articleService.getAll(1, 1, 7L, "  BaTtErY  ", 42L);
+
+        verify(articleRepository).findAllFiltered(7L, "battery", 42L, pageRequest);
+        verify(articleTranslationRepository).findAllByArticleIdInAndLanguageAndStatus(
+                List.of(1L), TranslationLanguage.ZH_CN, TranslationStatus.SUCCESS);
+        assertThat(page.content()).extracting(ArticleResponse::id).containsExactly(1L);
+        assertThat(page.content().getFirst().source().name()).isEqualTo("Energy Storage News");
+        assertThat(page.page()).isEqualTo(1);
+        assertThat(page.totalElements()).isEqualTo(3);
+    }
+
+    @Test
+    void keywordIdDoesNotRequireTextSearch() {
+        PageRequest pageRequest = PageRequest.of(0, 20);
+        when(articleRepository.findAllFiltered(null, "", 42L, pageRequest))
+                .thenReturn(new PageImpl<>(List.of(), pageRequest, 0));
+
+        assertThat(articleService.getAll(0, 20, null, null, 42L).content()).isEmpty();
+
+        verify(articleRepository).findAllFiltered(null, "", 42L, pageRequest);
+        verifyNoInteractions(articleTranslationRepository);
     }
 
     @Test

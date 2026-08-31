@@ -41,7 +41,7 @@ class ArticleControllerTest {
 
     @Test
     void returnsDefaultArticlePage() throws Exception {
-        when(articleService.getAll(0, 20, null, null)).thenReturn(new ArticlePageResponse(
+        when(articleService.getAll(0, 20, null, null, null)).thenReturn(new ArticlePageResponse(
                 List.of(articleResponse()),
                 0,
                 20,
@@ -70,12 +70,12 @@ class ArticleControllerTest {
                 .andExpect(jsonPath("$.first").value(true))
                 .andExpect(jsonPath("$.last").value(true));
 
-        verify(articleService).getAll(0, 20, null, null);
+        verify(articleService).getAll(0, 20, null, null, null);
     }
 
     @Test
     void acceptsCustomPageAndSize() throws Exception {
-        when(articleService.getAll(2, 5, null, null)).thenReturn(new ArticlePageResponse(
+        when(articleService.getAll(2, 5, null, null, null)).thenReturn(new ArticlePageResponse(
                 List.of(),
                 2,
                 5,
@@ -95,12 +95,12 @@ class ArticleControllerTest {
                 .andExpect(jsonPath("$.first").value(false))
                 .andExpect(jsonPath("$.last").value(true));
 
-        verify(articleService).getAll(2, 5, null, null);
+        verify(articleService).getAll(2, 5, null, null, null);
     }
 
     @Test
     void forwardsOptionalSourceAndKeywordFilters() throws Exception {
-        when(articleService.getAll(1, 10, 3L, "Battery")).thenReturn(new ArticlePageResponse(
+        when(articleService.getAll(1, 10, 3L, "Battery", null)).thenReturn(new ArticlePageResponse(
                 List.of(),
                 1,
                 10,
@@ -118,7 +118,42 @@ class ArticleControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isEmpty());
 
-        verify(articleService).getAll(1, 10, 3L, "Battery");
+        verify(articleService).getAll(1, 10, 3L, "Battery", null);
+    }
+
+    @Test
+    void acceptsKeywordIdWithoutChangingArticleResponse() throws Exception {
+        when(articleService.getAll(0, 20, null, null, 42L)).thenReturn(new ArticlePageResponse(
+                List.of(articleResponse()), 0, 20, 1, 1, true, true));
+
+        mockMvc.perform(get("/api/articles").param("keywordId", "42"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].id").value(1))
+                .andExpect(jsonPath("$.content[0].source.name").value("Energy Storage News"))
+                .andExpect(jsonPath("$.content[0].original.title").value("Battery storage expands"))
+                .andExpect(jsonPath("$.content[0].translation.title").value("电池储能扩张"));
+
+        verify(articleService).getAll(0, 20, null, null, 42L);
+    }
+
+    @Test
+    void combinesKeywordIdWithExistingSearchSourceAndPagination() throws Exception {
+        when(articleService.getAll(1, 5, 7L, "Battery", 42L)).thenReturn(new ArticlePageResponse(
+                List.of(), 1, 5, 0, 0, false, true));
+
+        mockMvc.perform(get("/api/articles?page=1&size=5&sourceId=7&keyword=Battery&keywordId=42"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content").isEmpty())
+                .andExpect(jsonPath("$.page").value(1));
+
+        verify(articleService).getAll(1, 5, 7L, "Battery", 42L);
+    }
+
+    @Test
+    void rejectsNonNumericKeywordId() throws Exception {
+        mockMvc.perform(get("/api/articles?keywordId=not-an-id"))
+                .andExpect(status().isBadRequest());
+        verifyNoInteractions(articleService);
     }
 
     @Test

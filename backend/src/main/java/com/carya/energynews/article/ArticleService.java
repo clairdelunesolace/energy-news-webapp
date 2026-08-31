@@ -38,11 +38,12 @@ public class ArticleService {
     }
 
     @Transactional(readOnly = true)
-    public ArticlePageResponse getAll(int page, int size, Long sourceId, String keyword) {
+    public ArticlePageResponse getAll(int page, int size, Long sourceId, String keyword, Long keywordId) {
         String normalizedKeyword = normalizeKeyword(keyword);
         Page<Article> articlePage = articleRepository.findAllFiltered(
                 sourceId,
                 normalizedKeyword,
+                keywordId,
                 PageRequest.of(page, size)
         );
         List<Article> articles = articlePage.getContent();

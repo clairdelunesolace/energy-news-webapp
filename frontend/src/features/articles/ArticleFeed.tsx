@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { getArticles } from '../../api/articles'
-import { getSources } from '../../api/sources'
+import { getWatchlists } from '../../api/watchlists'
 import type { ArticlePageResponse } from '../../types/articles'
-import type { SourceResponse } from '../../types/sources'
+import type { WatchlistResponse } from '../../types/watchlists'
 import { ArticleListItem } from './ArticleListItem'
 import { FeedToolbar } from './FeedToolbar'
 import { PaginationControls } from './PaginationControls'
@@ -15,26 +15,34 @@ export function ArticleFeed() {
   const [page, setPage] = useState(0)
   const [keywordInput, setKeywordInput] = useState('')
   const [submittedKeyword, setSubmittedKeyword] = useState('')
-  const [selectedSourceId, setSelectedSourceId] = useState<number | null>(null)
+  const [selectedKeywordId, setSelectedKeywordId] = useState<number | null>(null)
   const [articlePage, setArticlePage] = useState<ArticlePageResponse | null>(null)
   const [status, setStatus] = useState<LoadStatus>('loading')
-  const [sources, setSources] = useState<SourceResponse[]>([])
-  const [sourcesLoading, setSourcesLoading] = useState(true)
-  const [sourcesError, setSourcesError] = useState(false)
+  const [watchlists, setWatchlists] = useState<WatchlistResponse[]>([])
+  const [keywordsLoading, setKeywordsLoading] = useState(true)
+  const [keywordsError, setKeywordsError] = useState(false)
 
   useEffect(() => {
     const controller = new AbortController()
 
-    getSources(controller.signal)
+    getWatchlists(controller.signal)
       .then((response) => {
-        setSources(response.filter((source) => source.enabled))
-        setSourcesError(false)
-        setSourcesLoading(false)
+        setWatchlists(
+          response
+            .filter((watchlist) => watchlist.enabled)
+            .map((watchlist) => ({
+              ...watchlist,
+              keywords: watchlist.keywords.filter((keyword) => keyword.enabled),
+            }))
+            .filter((watchlist) => watchlist.keywords.length > 0),
+        )
+        setKeywordsError(false)
+        setKeywordsLoading(false)
       })
       .catch((error: unknown) => {
         if (error instanceof DOMException && error.name === 'AbortError') return
-        setSourcesError(true)
-        setSourcesLoading(false)
+        setKeywordsError(true)
+        setKeywordsLoading(false)
       })
 
     return () => controller.abort()
@@ -49,7 +57,7 @@ export function ArticleFeed() {
       {
         page,
         size: PAGE_SIZE,
-        sourceId: selectedSourceId ?? undefined,
+        keywordId: selectedKeywordId ?? undefined,
         keyword: submittedKeyword || undefined,
       },
       controller.signal,
@@ -64,16 +72,16 @@ export function ArticleFeed() {
       })
 
     return () => controller.abort()
-  }, [page, selectedSourceId, submittedKeyword])
+  }, [page, selectedKeywordId, submittedKeyword])
 
   const submitSearch = () => {
     setPage(0)
     setSubmittedKeyword(keywordInput.trim())
   }
 
-  const changeSource = (sourceId: number | null) => {
+  const changeKeyword = (keywordId: number | null) => {
     setPage(0)
-    setSelectedSourceId(sourceId)
+    setSelectedKeywordId(keywordId)
   }
 
   return (
@@ -82,11 +90,11 @@ export function ArticleFeed() {
         keywordInput={keywordInput}
         onKeywordInputChange={setKeywordInput}
         onSearch={submitSearch}
-        sources={sources}
-        selectedSourceId={selectedSourceId}
-        onSourceChange={changeSource}
-        sourcesLoading={sourcesLoading}
-        sourcesError={sourcesError}
+        watchlists={watchlists}
+        selectedKeywordId={selectedKeywordId}
+        onKeywordChange={changeKeyword}
+        keywordsLoading={keywordsLoading}
+        keywordsError={keywordsError}
       />
 
       <div className="article-feed__results" aria-live="polite" aria-busy={status === 'loading'}>

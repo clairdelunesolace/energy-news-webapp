@@ -4,6 +4,9 @@ import com.carya.energynews.source.Source;
 import com.carya.energynews.source.SourcePriority;
 import com.carya.energynews.source.SourceRepository;
 import com.carya.energynews.source.SourceType;
+import com.carya.energynews.watchlist.Keyword;
+import com.carya.energynews.watchlist.Watchlist;
+import com.carya.energynews.watchlistdiscovery.ArticleKeywordMatch;
 import jakarta.persistence.EntityManager;
 import jakarta.validation.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
@@ -14,6 +17,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 
 import java.time.Instant;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -134,8 +138,8 @@ class ArticleRepositoryTest {
         );
         entityManager.clear();
 
-        Page<Article> firstPage = articleRepository.findAllFiltered(null, "", PageRequest.of(0, 4));
-        Page<Article> secondPage = articleRepository.findAllFiltered(null, "", PageRequest.of(1, 4));
+        Page<Article> firstPage = articleRepository.findAllFiltered(null, "", null, PageRequest.of(0, 4));
+        Page<Article> secondPage = articleRepository.findAllFiltered(null, "", null, PageRequest.of(1, 4));
 
         assertThat(firstPage.getContent())
                 .extracting(Article::getId)
@@ -200,16 +204,19 @@ class ArticleRepositoryTest {
         Page<Article> sourceResults = articleRepository.findAllFiltered(
                 selectedSource.getId(),
                 "",
+                null,
                 PageRequest.of(0, 10)
         );
         Page<Article> keywordResults = articleRepository.findAllFiltered(
                 null,
                 "battery",
+                null,
                 PageRequest.of(0, 10)
         );
         Page<Article> combinedResults = articleRepository.findAllFiltered(
                 selectedSource.getId(),
                 "battery",
+                null,
                 PageRequest.of(0, 10)
         );
 
@@ -264,16 +271,19 @@ class ArticleRepositoryTest {
         Page<Article> firstPage = articleRepository.findAllFiltered(
                 null,
                 "storage",
+                null,
                 PageRequest.of(0, 2)
         );
         Page<Article> secondPage = articleRepository.findAllFiltered(
                 null,
                 "storage",
+                null,
                 PageRequest.of(1, 2)
         );
         Page<Article> noMatches = articleRepository.findAllFiltered(
                 Long.MAX_VALUE,
                 "",
+                null,
                 PageRequest.of(0, 20)
         );
 
@@ -292,6 +302,85 @@ class ArticleRepositoryTest {
         assertThat(noMatches.getTotalPages()).isZero();
         assertThat(noMatches.isFirst()).isTrue();
         assertThat(noMatches.isLast()).isTrue();
+    }
+
+    @Test
+    void filtersByExactKeywordIdWithStablePagesLoadedSourcesAndNoDuplicateArticles() {
+        Source source = saveSource("keyword-pages");
+        Watchlist watchlist = new Watchlist("Topics");
+        Keyword selected = watchlist.addKeyword("grid storage");
+        Keyword other = watchlist.addKeyword("long duration");
+        Watchlist otherWatchlist = new Watchlist("Other topics");
+        Keyword sameTextDifferentId = otherWatchlist.addKeyword("grid storage");
+        entityManager.persist(watchlist);
+        entityManager.persist(otherWatchlist);
+        Article newest = saveArticle(source, "matched-newest", COLLECTED_AT, COLLECTED_AT);
+        Article oldest = saveArticle(source, "matched-oldest", null, COLLECTED_AT);
+        Article otherOnly = saveArticle(source, "other-keyword", null, COLLECTED_AT);
+        Article unmatchedRss = saveArticle(source, "unmatched-rss", null, COLLECTED_AT);
+        entityManager.persist(new ArticleKeywordMatch(newest, selected));
+        entityManager.persist(new ArticleKeywordMatch(newest, other));
+        entityManager.persist(new ArticleKeywordMatch(oldest, selected));
+        entityManager.persist(new ArticleKeywordMatch(otherOnly, sameTextDifferentId));
+        entityManager.flush();
+        entityManager.clear();
+
+        Page<Article> first = articleRepository.findAllFiltered(null, "", selected.getId(), PageRequest.of(0, 1));
+        Page<Article> second = articleRepository.findAllFiltered(null, "", selected.getId(), PageRequest.of(1, 1));
+
+        assertThat(first.getContent()).extracting(Article::getId).containsExactly(newest.getId());
+        assertThat(second.getContent()).extracting(Article::getId).containsExactly(oldest.getId());
+        assertThat(first.getTotalElements()).isEqualTo(2);
+        assertThat(first.getTotalPages()).isEqualTo(2);
+        assertThat(first.isLast()).isFalse();
+        assertThat(second.getTotalElements()).isEqualTo(2);
+        assertThat(second.isLast()).isTrue();
+        assertThat(entityManager.getEntityManagerFactory().getPersistenceUnitUtil()
+                .isLoaded(first.getContent().getFirst(), "source")).isTrue();
+
+        Page<Article> all = articleRepository.findAllFiltered(null, "", null, PageRequest.of(0, 10));
+        assertThat(all.getContent()).extracting(Article::getId)
+                .containsExactly(newest.getId(), unmatchedRss.getId(), otherOnly.getId(), oldest.getId());
+        assertThat(all.getTotalElements()).isEqualTo(4);
+        Page<Article> unknown = articleRepository.findAllFiltered(null, "", Long.MAX_VALUE, PageRequest.of(0, 10));
+        assertThat(unknown.getContent()).isEmpty();
+        assertThat(unknown.getTotalElements()).isZero();
+        assertThat(unknown.getTotalPages()).isZero();
+    }
+
+    @Test
+    void combinesKeywordIdWithTextSearchAndOptionalSourceFilter() {
+        Source selectedSource = saveSource("keyword-combined");
+        Source otherSource = saveSource("keyword-other");
+        Watchlist watchlist = new Watchlist("Combined topics");
+        Keyword selected = watchlist.addKeyword("topic independent of article text");
+        entityManager.persist(watchlist);
+        Article titleMatch = saveArticle(selectedSource, "combined-title", "BATTERY deployment", null,
+                COLLECTED_AT, COLLECTED_AT);
+        Article descriptionMatch = saveArticle(selectedSource, "combined-description", "Grid project", "Battery system",
+                null, COLLECTED_AT);
+        Article otherSourceMatch = saveArticle(otherSource, "combined-other-source", "Battery market", null,
+                null, COLLECTED_AT);
+        Article noTextMatch = saveArticle(selectedSource, "combined-no-text", null, COLLECTED_AT);
+        saveArticle(selectedSource, "combined-unmatched", "Battery news without explicit match", null,
+                COLLECTED_AT, COLLECTED_AT);
+        for (Article article : List.of(titleMatch, descriptionMatch, otherSourceMatch, noTextMatch)) {
+            entityManager.persist(new ArticleKeywordMatch(article, selected));
+        }
+        entityManager.flush();
+        entityManager.clear();
+
+        Page<Article> combined = articleRepository.findAllFiltered(
+                selectedSource.getId(), "battery", selected.getId(), PageRequest.of(0, 1));
+        Page<Article> second = articleRepository.findAllFiltered(
+                selectedSource.getId(), "battery", selected.getId(), PageRequest.of(1, 1));
+        assertThat(combined.getContent()).extracting(Article::getId).containsExactly(titleMatch.getId());
+        assertThat(second.getContent()).extracting(Article::getId).containsExactly(descriptionMatch.getId());
+        assertThat(combined.getTotalElements()).isEqualTo(2);
+        assertThat(combined.getTotalPages()).isEqualTo(2);
+        assertThat(articleRepository.findAllFiltered(null, "battery", selected.getId(), PageRequest.of(0, 10))
+                .getContent()).extracting(Article::getId)
+                .containsExactly(titleMatch.getId(), otherSourceMatch.getId(), descriptionMatch.getId());
     }
 
     @Test

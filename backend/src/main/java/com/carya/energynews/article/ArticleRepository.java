@@ -33,6 +33,10 @@ public interface ArticleRepository extends JpaRepository<Article, Long> {
                     FROM Article article
                     JOIN FETCH article.source
                     WHERE (:sourceId IS NULL OR article.source.id = :sourceId)
+                      AND (:keywordId IS NULL OR EXISTS (
+                          SELECT keywordMatch.id FROM ArticleKeywordMatch keywordMatch
+                          WHERE keywordMatch.article = article AND keywordMatch.keyword.id = :keywordId
+                      ))
                       AND (
                           LOWER(article.title) LIKE CONCAT('%', :keyword, '%')
                           OR LOWER(article.description) LIKE CONCAT('%', :keyword, '%')
@@ -47,6 +51,10 @@ public interface ArticleRepository extends JpaRepository<Article, Long> {
                     SELECT COUNT(article)
                     FROM Article article
                     WHERE (:sourceId IS NULL OR article.source.id = :sourceId)
+                      AND (:keywordId IS NULL OR EXISTS (
+                          SELECT keywordMatch.id FROM ArticleKeywordMatch keywordMatch
+                          WHERE keywordMatch.article = article AND keywordMatch.keyword.id = :keywordId
+                      ))
                       AND (
                           LOWER(article.title) LIKE CONCAT('%', :keyword, '%')
                           OR LOWER(article.description) LIKE CONCAT('%', :keyword, '%')
@@ -56,6 +64,7 @@ public interface ArticleRepository extends JpaRepository<Article, Long> {
     Page<Article> findAllFiltered(
             @Param("sourceId") Long sourceId,
             @Param("keyword") String keyword,
+            @Param("keywordId") Long keywordId,
             Pageable pageable
     );
 
