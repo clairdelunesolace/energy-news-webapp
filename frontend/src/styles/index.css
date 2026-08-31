@@ -793,6 +793,11 @@ a {
 }
 
 @media (max-width: 44rem) {
+  .app-header__content {
+    flex-wrap: wrap;
+    padding-top: var(--spacing-2);
+  }
+
   .app-header__content,
   .page-shell {
     width: min(100% - 2 * var(--spacing-4), var(--content-width));
@@ -803,8 +808,11 @@ a {
   }
 
   .app-header__navigation {
+    order: 3;
+    flex-basis: 100%;
+    min-height: 2.75rem;
     gap: var(--spacing-3);
-    margin-left: var(--spacing-4);
+    margin-left: 0;
   }
 
   .app-header__navigation a {
