@@ -21,6 +21,12 @@ app:
   daily-brief:
     zone: "${DAILY_BRIEF_ZONE:Asia/Shanghai}"
     max-items: ${DAILY_BRIEF_MAX_ITEMS:10}
+    ai:
+      provider: "${DAILY_BRIEF_AI_PROVIDER:none}"
+      model: "${DAILY_BRIEF_AI_MODEL:openai/gpt-oss-20b}"
+      evidence-guard-enabled: ${DAILY_BRIEF_AI_EVIDENCE_GUARD_ENABLED:true}
+      groq:
+        api-key: "${GROQ_API_KEY:}"
   discovery:
     provider: ${NEWS_DISCOVERY_PROVIDER:none}
     scheduler:

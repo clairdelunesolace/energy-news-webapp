@@ -2,6 +2,7 @@ package com.carya.energynews.dailybrief;
 
 import com.carya.energynews.article.Article;
 import com.carya.energynews.article.ArticleRepository;
+import com.carya.energynews.dailybriefanalysis.DailyBriefAnalysisRepository;
 import com.carya.energynews.translation.ArticleTranslation;
 import com.carya.energynews.translation.ArticleTranslationRepository;
 import com.carya.energynews.translation.TranslationLanguage;
@@ -35,6 +36,7 @@ public class DailyBriefService {
     private final ArticleRepository articleRepository;
     private final ArticleTranslationRepository translationRepository;
     private final ArticleKeywordMatchRepository matchRepository;
+    private final DailyBriefAnalysisRepository analysisRepository;
     private final DailyBriefProperties properties;
     private final Clock clock;
 
@@ -45,6 +47,7 @@ public class DailyBriefService {
             ArticleRepository articleRepository,
             ArticleTranslationRepository translationRepository,
             ArticleKeywordMatchRepository matchRepository,
+            DailyBriefAnalysisRepository analysisRepository,
             DailyBriefProperties properties,
             Clock clock
     ) {
@@ -54,6 +57,7 @@ public class DailyBriefService {
         this.articleRepository = articleRepository;
         this.translationRepository = translationRepository;
         this.matchRepository = matchRepository;
+        this.analysisRepository = analysisRepository;
         this.properties = properties;
         this.clock = clock;
     }
@@ -97,6 +101,7 @@ public class DailyBriefService {
         brief.updateSnapshot(properties.zone(), windowStart, windowEnd, candidateCount);
         brief = dailyBriefRepository.saveAndFlush(brief);
 
+        analysisRepository.deleteAllByDailyBriefId(brief.getId());
         dailyBriefItemRepository.deleteAllByDailyBriefId(brief.getId());
 
         List<Long> articleIds = candidates.stream()
