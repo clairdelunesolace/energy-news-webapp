@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ApiError } from '../api/client'
-import { generateDailyBriefAnalysis, getDailyBrief, getDailyBriefAnalysis } from '../api/dailyBriefs'
+import { generateDailyBrief, generateDailyBriefAnalysis, getDailyBrief, getDailyBriefAnalysis } from '../api/dailyBriefs'
 import { getWatchlists } from '../api/watchlists'
 import type { DailyBriefAnalysisResponse, DailyBriefResponse } from '../types/dailyBriefs'
 import type { WatchlistResponse } from '../types/watchlists'
@@ -13,6 +13,7 @@ export function DailyBriefsPage() {
   const [watchlistStatus, setWatchlistStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [reload, setReload] = useState(0)
   const [generating, setGenerating] = useState(false)
+  const [selectionChanged, setSelectionChanged] = useState(false)
   const watchlistId = searchParams.get('watchlistId') ?? ''
   const date = searchParams.get('date') ?? ''
   const hasSelection = watchlistId !== '' || date !== ''
@@ -60,7 +61,9 @@ export function DailyBriefsPage() {
             initialWatchlistId={watchlistId}
             initialDate={date}
             disabled={generating}
+            onEdit={() => setSelectionChanged(true)}
             onSelect={(selectedId, selectedDate) => {
+              setSelectionChanged(false)
               setSearchParams({ watchlistId: selectedId, date: selectedDate })
               setReload((value) => value + 1)
             }}
@@ -72,18 +75,19 @@ export function DailyBriefsPage() {
           <p className="status-message status-message--error daily-brief-state" role="alert">请选择有效的关注主题和日期。</p>
         )}
         {validSelection && (
-          <BriefContent key={`${watchlistId}:${date}:${reload}`} watchlistId={Number(watchlistId)} date={date} onGeneratingChange={setGenerating} />
+          <BriefContent key={`${watchlistId}:${date}:${reload}`} watchlistId={Number(watchlistId)} date={date} selectionChanged={selectionChanged} onGeneratingChange={setGenerating} />
         )}
       </section>
     </main>
   )
 }
 
-function BriefSelector({ watchlists, initialWatchlistId, initialDate, disabled, onSelect }: {
+function BriefSelector({ watchlists, initialWatchlistId, initialDate, disabled, onEdit, onSelect }: {
   watchlists: WatchlistResponse[]
   initialWatchlistId: string
   initialDate: string
   disabled: boolean
+  onEdit(): void
   onSelect(id: string, date: string): void
 }) {
   const [watchlistId, setWatchlistId] = useState(initialWatchlistId || String(watchlists[0].id))
@@ -97,7 +101,7 @@ function BriefSelector({ watchlists, initialWatchlistId, initialDate, disabled, 
     <form className="feed-toolbar daily-brief-selector" onSubmit={submit}>
       <label className="feed-toolbar__field">
         <span className="feed-toolbar__label">关注主题</span>
-        <select value={watchlistId} onChange={(event) => setWatchlistId(event.target.value)} disabled={disabled} required>
+        <select value={watchlistId} onChange={(event) => { setWatchlistId(event.target.value); onEdit() }} disabled={disabled} required>
           {initialWatchlistId && !watchlists.some((item) => String(item.id) === initialWatchlistId) && (
             <option value={initialWatchlistId}>主题 #{initialWatchlistId}</option>
           )}
@@ -106,16 +110,17 @@ function BriefSelector({ watchlists, initialWatchlistId, initialDate, disabled, 
       </label>
       <label className="feed-toolbar__field">
         <span className="feed-toolbar__label">简报日期</span>
-        <input type="date" value={date} onChange={(event) => setDate(event.target.value)} disabled={disabled} required />
+        <input type="date" value={date} onChange={(event) => { setDate(event.target.value); onEdit() }} disabled={disabled} required />
       </label>
       <button className="button button--secondary" type="submit" disabled={disabled || !watchlistId || !isDate(date)}>查看简报</button>
     </form>
   )
 }
 
-function BriefContent({ watchlistId, date, onGeneratingChange }: {
+function BriefContent({ watchlistId, date, selectionChanged, onGeneratingChange }: {
   watchlistId: number
   date: string
+  selectionChanged: boolean
   onGeneratingChange(value: boolean): void
 }) {
   const [brief, setBrief] = useState<DailyBriefResponse | null>(null)
@@ -154,6 +159,31 @@ function BriefContent({ watchlistId, date, onGeneratingChange }: {
     }
   }, [watchlistId, date, onGeneratingChange])
 
+  const generateBrief = async () => {
+    if (status !== 'not-found' || selectionChanged || generationRequest.current) return
+    const controller = new AbortController()
+    generationRequest.current = controller
+    setGenerating(true)
+    onGeneratingChange(true)
+    setError(null)
+    try {
+      const generated = await generateDailyBrief(watchlistId, date, controller.signal)
+      if (!controller.signal.aborted) {
+        setBrief(generated)
+        setAnalysis(null)
+        setStatus('ready')
+      }
+    } catch (generationError: unknown) {
+      if (!controller.signal.aborted) setError(briefGenerationErrorMessage(generationError))
+    } finally {
+      if (!controller.signal.aborted) {
+        generationRequest.current = null
+        setGenerating(false)
+        onGeneratingChange(false)
+      }
+    }
+  }
+
   const generate = async () => {
     if (!brief || brief.itemCount === 0 || analysisLoading || generationRequest.current) return
     const controller = new AbortController()
@@ -180,7 +210,18 @@ function BriefContent({ watchlistId, date, onGeneratingChange }: {
   }
 
   if (status === 'loading') return <p className="status-message daily-brief-state" role="status">正在加载简报…</p>
-  if (status === 'not-found') return <p className="status-message daily-brief-state">该主题在所选日期还没有简报，请更换主题或日期。</p>
+  if (status === 'not-found') return (
+    <div className="status-message daily-brief-state" aria-busy={generating}>
+      <p>该主题在所选日期还没有简报。</p>
+      <p className="daily-brief-footnote">将根据数据库中该日期已有的匹配新闻生成简报。</p>
+      <button className="button button--primary" type="button" onClick={generateBrief} disabled={generating || selectionChanged}>
+        {generating ? '正在生成简报...' : '生成该日简报'}
+      </button>
+      {generating && <p className="daily-brief-notice" role="status">正在生成简报...</p>}
+      {selectionChanged && <p className="daily-brief-footnote">关注主题或日期已改变，请先点击“查看简报”。</p>}
+      {error && <p className="daily-brief-error" role="alert">{error}</p>}
+    </div>
+  )
   if (status === 'error' || !brief) return <p className="status-message status-message--error daily-brief-state" role="alert">简报加载失败，请点击“查看简报”重试。</p>
 
   return (
@@ -207,7 +248,7 @@ function BriefContent({ watchlistId, date, onGeneratingChange }: {
         {error && <p className="daily-brief-error" role="alert">{error}</p>}
         {analysisLoading && <p className="status-message" role="status">正在加载 AI 简报…</p>}
         {!analysisLoading && !analysis && !error && (
-          <p className="status-message">{brief.itemCount === 0 ? '这份简报暂无入选文章，无法生成 AI 分析。' : '尚未生成 AI 简报，点击上方按钮开始分析。'}</p>
+          <p className="status-message">{brief.itemCount === 0 ? '该日期暂无匹配新闻，已生成空简报。' : '尚未生成 AI 简报，点击上方按钮开始分析。'}</p>
         )}
         {analysis && (
           <>
@@ -239,6 +280,19 @@ function BriefContent({ watchlistId, date, onGeneratingChange }: {
       </section>
     </div>
   )
+}
+
+function briefGenerationErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    switch (error.status) {
+      case 400: return '关注主题或日期无效，请重新选择。'
+      case 401: return '登录状态已过期，请重新登录。'
+      case 403: return '操作未完成，请刷新页面后重试。'
+      case 404: return '该关注主题已不可用，请重新选择。'
+      case 409: return '该关注主题已停用，无法生成简报。'
+    }
+  }
+  return '简报生成失败，请稍后重试。'
 }
 
 function generationErrorMessage(error: unknown): string {

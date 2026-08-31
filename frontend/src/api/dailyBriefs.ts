@@ -6,6 +6,15 @@ export function getDailyBrief(watchlistId: number, date: string, signal?: AbortS
   return fetchJson<DailyBriefResponse>(`/api/daily-briefs?${query}`, { signal })
 }
 
+export function generateDailyBrief(watchlistId: number, date: string, signal?: AbortSignal) {
+  return fetchJson<DailyBriefResponse>('/api/daily-briefs/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ watchlistId, date }),
+    signal,
+  })
+}
+
 export async function getDailyBriefAnalysis(id: number, signal?: AbortSignal) {
   try {
     return await fetchJson<DailyBriefAnalysisResponse>(`/api/daily-briefs/${id}/analysis`, { signal })
