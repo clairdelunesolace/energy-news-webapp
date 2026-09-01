@@ -39,6 +39,9 @@ class ArticleControllerTest {
     @MockitoBean
     private ArticleService articleService;
 
+    @MockitoBean
+    private ArticlePostProcessingBackfillService articlePostProcessingBackfillService;
+
     @Test
     void returnsDefaultArticlePage() throws Exception {
         when(articleService.getAll(0, 20, null, null, null)).thenReturn(new ArticlePageResponse(
@@ -192,6 +195,89 @@ class ArticleControllerTest {
     }
 
     @Test
+    void backfillsPostProcessingForExactlyOneRequestedArticle() throws Exception {
+        when(articlePostProcessingBackfillService.backfill(41L)).thenReturn(
+                backfillResponse(ArticlePostProcessingBackfillResponse.OverallStatus.SUCCESS)
+        );
+
+        mockMvc.perform(post("/api/articles/post-processing/backfill")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"articleIds":[41]}
+                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.articleId").value(41))
+                .andExpect(jsonPath("$.metadataTranslationStatus").value("SUCCESS"))
+                .andExpect(jsonPath("$.contentExtractionStatus").value("SUCCESS"))
+                .andExpect(jsonPath("$.contentTranslationStatus").value("SUCCESS"))
+                .andExpect(jsonPath("$.overallStatus").value("SUCCESS"));
+
+        verify(articlePostProcessingBackfillService).backfill(41L);
+    }
+
+    @Test
+    void rejectsBackfillRequestsThatAreNotSingleArticleRecovery() throws Exception {
+        mockMvc.perform(post("/api/articles/post-processing/backfill")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"articleIds":[41,42]}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.title").value("Validation failed"))
+                .andExpect(jsonPath("$.errors.articleIds")
+                        .value("must contain exactly one article id"));
+
+        verifyNoInteractions(articlePostProcessingBackfillService);
+    }
+
+    @Test
+    void returnsPartialSuccessAsOk() throws Exception {
+        when(articlePostProcessingBackfillService.backfill(41L)).thenReturn(
+                new ArticlePostProcessingBackfillResponse(
+                        41L,
+                        ArticlePostProcessingBackfillResponse.StepStatus.SUCCESS,
+                        ArticlePostProcessingBackfillResponse.StepStatus.FAILED,
+                        ArticlePostProcessingBackfillResponse.StepStatus.NOT_AVAILABLE,
+                        ArticlePostProcessingBackfillResponse.OverallStatus.PARTIAL_SUCCESS
+                )
+        );
+
+        mockMvc.perform(post("/api/articles/post-processing/backfill")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"articleIds":[41]}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.metadataTranslationStatus").value("SUCCESS"))
+                .andExpect(jsonPath("$.contentExtractionStatus").value("FAILED"))
+                .andExpect(jsonPath("$.contentTranslationStatus").value("NOT_AVAILABLE"))
+                .andExpect(jsonPath("$.overallStatus").value("PARTIAL_SUCCESS"));
+    }
+
+    @Test
+    void mapsMetadataTranslationFailureToStructuredBadGateway() throws Exception {
+        when(articlePostProcessingBackfillService.backfill(41L)).thenReturn(
+                new ArticlePostProcessingBackfillResponse(
+                        41L,
+                        ArticlePostProcessingBackfillResponse.StepStatus.FAILED,
+                        ArticlePostProcessingBackfillResponse.StepStatus.SUCCESS,
+                        ArticlePostProcessingBackfillResponse.StepStatus.NOT_AVAILABLE,
+                        ArticlePostProcessingBackfillResponse.OverallStatus.FAILED
+                )
+        );
+
+        mockMvc.perform(post("/api/articles/post-processing/backfill")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"articleIds":[41]}
+                                """))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.articleId").value(41))
+                .andExpect(jsonPath("$.metadataTranslationStatus").value("FAILED"))
+                .andExpect(jsonPath("$.overallStatus").value("FAILED"));
+    }
+
+    @Test
     void returnsNotFoundProblemWhenArticleDoesNotExist() throws Exception {
         when(articleService.getById(99L)).thenThrow(new ArticleNotFoundException(99L));
 
@@ -337,6 +423,18 @@ class ArticleControllerTest {
                 "Energy Storage News",
                 CREATED_AT,
                 UPDATED_AT
+        );
+    }
+
+    private static ArticlePostProcessingBackfillResponse backfillResponse(
+            ArticlePostProcessingBackfillResponse.OverallStatus overallStatus
+    ) {
+        return new ArticlePostProcessingBackfillResponse(
+                41L,
+                ArticlePostProcessingBackfillResponse.StepStatus.SUCCESS,
+                ArticlePostProcessingBackfillResponse.StepStatus.SUCCESS,
+                ArticlePostProcessingBackfillResponse.StepStatus.SUCCESS,
+                overallStatus
         );
     }
 }

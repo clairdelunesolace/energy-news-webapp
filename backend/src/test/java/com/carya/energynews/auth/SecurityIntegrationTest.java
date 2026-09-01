@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.carya.energynews.article.ArticleController;
 import com.carya.energynews.article.ArticlePageResponse;
+import com.carya.energynews.article.ArticlePostProcessingBackfillResponse;
+import com.carya.energynews.article.ArticlePostProcessingBackfillService;
 import com.carya.energynews.article.ArticleService;
 import com.carya.energynews.health.HealthController;
 import com.carya.energynews.source.SourceController;
@@ -78,6 +80,9 @@ class SecurityIntegrationTest {
     private ArticleService articleService;
 
     @MockitoBean
+    private ArticlePostProcessingBackfillService articlePostProcessingBackfillService;
+
+    @MockitoBean
     private SourceService sourceService;
 
     @MockitoBean
@@ -143,6 +148,10 @@ class SecurityIntegrationTest {
         mockMvc.perform(get("/api/watchlists"))
                 .andExpect(status().isUnauthorized());
         mockMvc.perform(post("/api/news-sync"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(post("/api/articles/post-processing/backfill")
+                        .contentType("application/json")
+                        .content("{\"articleIds\":[41]}"))
                 .andExpect(status().isUnauthorized());
         mockMvc.perform(post("/api/watchlists"))
                 .andExpect(status().isUnauthorized());
@@ -250,6 +259,35 @@ class SecurityIntegrationTest {
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.name").value("NVIDIA"));
+    }
+
+    @Test
+    void articlePostProcessingBackfillRequiresCsrfAndSucceedsWithValidToken() throws Exception {
+        String requestBody = "{\"articleIds\":[41]}";
+        mockMvc.perform(post("/api/articles/post-processing/backfill")
+                        .with(user("configured-admin"))
+                        .contentType("application/json")
+                        .content(requestBody))
+                .andExpect(status().isForbidden());
+
+        CsrfValues csrf = getCsrf(null);
+        when(articlePostProcessingBackfillService.backfill(41L)).thenReturn(
+                new ArticlePostProcessingBackfillResponse(
+                        41L,
+                        ArticlePostProcessingBackfillResponse.StepStatus.SUCCESS,
+                        ArticlePostProcessingBackfillResponse.StepStatus.SUCCESS,
+                        ArticlePostProcessingBackfillResponse.StepStatus.SUCCESS,
+                        ArticlePostProcessingBackfillResponse.OverallStatus.SUCCESS
+                )
+        );
+        mockMvc.perform(post("/api/articles/post-processing/backfill")
+                        .with(user("configured-admin"))
+                        .cookie(csrf.cookie())
+                        .header(csrf.headerName(), csrf.token())
+                        .contentType("application/json")
+                        .content(requestBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contentTranslationStatus").value("SUCCESS"));
     }
 
     @Test

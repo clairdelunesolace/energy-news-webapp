@@ -1,5 +1,9 @@
 import { fetchJson } from './client'
-import type { ArticlePageResponse, ArticleResponse } from '../types/articles'
+import type {
+  ArticlePageResponse,
+  ArticlePostProcessingBackfillResponse,
+  ArticleResponse,
+} from '../types/articles'
 
 export interface GetArticlesParams {
   page?: number
@@ -29,4 +33,14 @@ export function getArticles(
 
 export function getArticle(id: number, signal?: AbortSignal): Promise<ArticleResponse> {
   return fetchJson<ArticleResponse>(`/api/articles/${id}`, { signal })
+}
+
+export function backfillArticlePostProcessing(
+  id: number,
+): Promise<ArticlePostProcessingBackfillResponse> {
+  return fetchJson<ArticlePostProcessingBackfillResponse>('/api/articles/post-processing/backfill', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ articleIds: [id] }),
+  })
 }

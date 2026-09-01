@@ -1,9 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { getArticle } from '../api/articles'
+import { backfillArticlePostProcessing, getArticle } from '../api/articles'
 import { ApiError } from '../api/client'
+import {
+  getArticleTranslationView,
+  getTranslationRecoveryMessage,
+  recoverArticleTranslation,
+} from '../features/articles/articleTranslationRecovery.ts'
 import { formatArticleDate } from '../features/articles/formatArticleDate'
 import type { ArticleResponse } from '../types/articles'
+import type { TranslationRecoveryStatus } from '../features/articles/articleTranslationRecovery.ts'
 
 type LoadStatus = 'loading' | 'success' | 'not-found' | 'error'
 
@@ -13,9 +19,11 @@ export function ArticleDetailPage() {
   const isValidArticleId = Number.isSafeInteger(articleId) && articleId > 0
   const [article, setArticle] = useState<ArticleResponse | null>(null)
   const [status, setStatus] = useState<LoadStatus>('loading')
+  const [recoveryStatus, setRecoveryStatus] = useState<TranslationRecoveryStatus>('idle')
 
   useEffect(() => {
     setArticle(null)
+    setRecoveryStatus('idle')
 
     if (!isValidArticleId) {
       setStatus('not-found')
@@ -38,6 +46,18 @@ export function ArticleDetailPage() {
     return () => controller.abort()
   }, [articleId, isValidArticleId])
 
+  async function handleTranslationRecovery() {
+    if (!article || recoveryStatus === 'submitting') return
+
+    setRecoveryStatus('submitting')
+    const outcome = await recoverArticleTranslation(article.id, {
+      backfill: backfillArticlePostProcessing,
+      reload: getArticle,
+    })
+    if (outcome.article) setArticle(outcome.article)
+    setRecoveryStatus(outcome.status)
+  }
+
   return (
     <main className="page-shell">
       <div className="article-detail-page">
@@ -51,33 +71,45 @@ export function ArticleDetailPage() {
           {status === 'error' && (
             <p className="status-message status-message--error">资讯加载失败，请稍后重试。</p>
           )}
-          {status === 'success' && article && <ArticleDetail article={article} />}
+          {status === 'success' && article && (
+            <ArticleDetail
+              article={article}
+              recoveryStatus={recoveryStatus}
+              onRecoverTranslation={handleTranslationRecovery}
+            />
+          )}
         </div>
       </div>
     </main>
   )
 }
 
-function ArticleDetail({ article }: { article: ArticleResponse }) {
-  const hasChineseTranslation =
-    article.original.language === 'EN' && article.translation !== null
-  const translatedTitle = article.translation?.title?.trim() || null
-  const translatedDescription = article.translation?.description?.trim() || null
-  const translatedContent = article.translation?.content?.trim() || null
-  const originalDescription = article.original.description?.trim() || null
-  const originalContent = article.original.content?.trim() || null
-  const primaryTitle =
-    hasChineseTranslation && translatedTitle ? translatedTitle : article.original.title
-  const primaryDescription = hasChineseTranslation
-    ? translatedDescription
-    : originalDescription
-  const primaryContent = hasChineseTranslation ? translatedContent : originalContent
+function ArticleDetail({
+  article,
+  recoveryStatus,
+  onRecoverTranslation,
+}: {
+  article: ArticleResponse
+  recoveryStatus: TranslationRecoveryStatus
+  onRecoverTranslation: () => void
+}) {
+  const {
+    hasChineseTranslation,
+    needsTranslationRecovery,
+    originalDescription,
+    originalContent,
+    primaryTitle,
+    primaryDescription,
+    primaryContent,
+    translatedTitle,
+  } = getArticleTranslationView(article)
   const originalLanguage = article.original.language === 'ZH_CN' ? 'zh-CN' : 'en'
   const primaryTitleLanguage =
     hasChineseTranslation && translatedTitle ? 'zh-CN' : originalLanguage
   const primaryDescriptionLanguage = hasChineseTranslation ? 'zh-CN' : originalLanguage
   const primaryContentLanguage = hasChineseTranslation ? 'zh-CN' : originalLanguage
   const timestamp = article.publishedAt ?? article.collectedAt
+  const recoveryMessage = getTranslationRecoveryMessage(recoveryStatus)
 
   return (
     <article className="article-detail">
@@ -104,14 +136,35 @@ function ArticleDetail({ article }: { article: ArticleResponse }) {
         </section>
       )}
 
-      <a
-        className="article-detail__external-link"
-        href={article.url}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        查看原文 ↗
-      </a>
+      <div className="article-detail__actions">
+        <a
+          className="article-detail__external-link"
+          href={article.url}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          查看原文 ↗
+        </a>
+
+        {needsTranslationRecovery && (
+          <button
+            className="button button--secondary"
+            type="button"
+            disabled={recoveryStatus === 'submitting'}
+            onClick={onRecoverTranslation}
+          >
+            {recoveryStatus === 'submitting' ? '正在补翻译...' : '补翻译'}
+          </button>
+        )}
+      </div>
+
+      <div className="article-detail__recovery-status" aria-live="polite">
+        {recoveryMessage && (
+          <p className={recoveryStatus === 'error' ? 'article-detail__recovery-error' : undefined}>
+            {recoveryMessage}
+          </p>
+        )}
+      </div>
 
       {hasChineseTranslation && (
         <details className="article-detail__original">

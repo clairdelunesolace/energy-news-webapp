@@ -2,6 +2,7 @@ package com.carya.energynews.article;
 
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -18,9 +19,14 @@ public class ArticleController {
     private static final int MAX_PAGE_SIZE = 100;
 
     private final ArticleService articleService;
+    private final ArticlePostProcessingBackfillService articlePostProcessingBackfillService;
 
-    public ArticleController(ArticleService articleService) {
+    public ArticleController(
+            ArticleService articleService,
+            ArticlePostProcessingBackfillService articlePostProcessingBackfillService
+    ) {
         this.articleService = articleService;
+        this.articlePostProcessingBackfillService = articlePostProcessingBackfillService;
     }
 
     @GetMapping
@@ -46,5 +52,18 @@ public class ArticleController {
     @ResponseStatus(HttpStatus.CREATED)
     public CreateArticleResponse create(@Valid @RequestBody CreateArticleRequest request) {
         return articleService.create(request);
+    }
+
+    @PostMapping("/post-processing/backfill")
+    public ResponseEntity<ArticlePostProcessingBackfillResponse> backfillPostProcessing(
+            @Valid @RequestBody ArticlePostProcessingBackfillRequest request
+    ) {
+        ArticlePostProcessingBackfillResponse response = articlePostProcessingBackfillService
+                .backfill(request.articleIds().getFirst());
+        if (response.overallStatus()
+                == ArticlePostProcessingBackfillResponse.OverallStatus.FAILED) {
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(response);
+        }
+        return ResponseEntity.ok(response);
     }
 }

@@ -108,8 +108,9 @@ class ArticlePostProcessingServiceTest {
     @Test
     void contentExtractionFailureKeepsSuccessfulMetadataAndSkipsContentTranslation() {
         Article article = article(SourceLanguage.EN, 13L);
+        ArticleTranslation metadataTranslation = metadataTranslation(article);
         when(translationService.translate(article, TranslationLanguage.ZH_CN))
-                .thenReturn(metadataTranslation(article));
+                .thenReturn(metadataTranslation);
         when(articleContentService.enrichContent(article))
                 .thenThrow(new ArticleContentFetchException("Publisher blocked request"));
 
@@ -124,14 +125,18 @@ class ArticlePostProcessingServiceTest {
                 false
         ));
         assertThat(article.getContent()).isNull();
+        assertThat(metadataTranslation.getStatus()).isEqualTo(TranslationStatus.SUCCESS);
+        assertThat(metadataTranslation.getTitle()).isEqualTo("中文标题");
+        assertThat(metadataTranslation.getDescription()).isEqualTo("中文摘要");
         verifyNoInteractions(contentTranslationService);
     }
 
     @Test
     void contentTranslationFailureKeepsExtractedOriginalContent() {
         Article article = article(SourceLanguage.EN, 14L);
+        ArticleTranslation metadataTranslation = metadataTranslation(article);
         when(translationService.translate(article, TranslationLanguage.ZH_CN))
-                .thenReturn(metadataTranslation(article));
+                .thenReturn(metadataTranslation);
         when(articleContentService.enrichContent(article)).thenAnswer(invocation -> {
             article.setContent("Extracted original content");
             return article;
@@ -152,6 +157,9 @@ class ArticlePostProcessingServiceTest {
                 true
         ));
         assertThat(article.getContent()).isEqualTo("Extracted original content");
+        assertThat(metadataTranslation.getStatus()).isEqualTo(TranslationStatus.SUCCESS);
+        assertThat(metadataTranslation.getTitle()).isEqualTo("中文标题");
+        assertThat(metadataTranslation.getDescription()).isEqualTo("中文摘要");
     }
 
     @Test

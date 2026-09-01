@@ -33,6 +33,21 @@ export interface ArticleResponse {
   updatedAt: string
 }
 
+export type ArticlePostProcessingStepStatus = 'SUCCESS' | 'FAILED' | 'NOT_AVAILABLE'
+
+export type ArticlePostProcessingOverallStatus =
+  | 'SUCCESS'
+  | 'PARTIAL_SUCCESS'
+  | 'FAILED'
+
+export interface ArticlePostProcessingBackfillResponse {
+  articleId: number
+  metadataTranslationStatus: ArticlePostProcessingStepStatus
+  contentExtractionStatus: ArticlePostProcessingStepStatus
+  contentTranslationStatus: ArticlePostProcessingStepStatus
+  overallStatus: ArticlePostProcessingOverallStatus
+}
+
 export interface ArticlePageResponse {
   content: ArticleResponse[]
   page: number
