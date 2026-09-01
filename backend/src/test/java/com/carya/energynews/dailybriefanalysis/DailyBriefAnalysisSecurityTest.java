@@ -9,6 +9,8 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.List;
+
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -41,21 +43,21 @@ class DailyBriefAnalysisSecurityTest {
     @Test
     void authenticatedPostRequiresCsrf() throws Exception {
         mockMvc.perform(post("/api/daily-briefs/1/analysis/generate")
-                        .with(user("configured-admin")))
+                        .with(user("configured-admin").authorities(List.of())))
                 .andExpect(status().isForbidden());
     }
 
     @Test
-    void authenticatedRequestsSucceedWithRequiredCsrf() throws Exception {
+    void authenticatedAccountWithoutRolesSucceedsWithRequiredCsrf() throws Exception {
         when(analysisService.generate(1L)).thenReturn(DailyBriefAnalysisControllerTest.response());
         when(analysisService.get(1L)).thenReturn(DailyBriefAnalysisControllerTest.response());
 
         mockMvc.perform(post("/api/daily-briefs/1/analysis/generate")
-                        .with(user("configured-admin"))
+                        .with(user("configured-admin").authorities(List.of()))
                         .with(csrf()))
                 .andExpect(status().isOk());
         mockMvc.perform(get("/api/daily-briefs/1/analysis")
-                        .with(user("configured-admin")))
+                        .with(user("configured-admin").authorities(List.of())))
                 .andExpect(status().isOk());
     }
 }

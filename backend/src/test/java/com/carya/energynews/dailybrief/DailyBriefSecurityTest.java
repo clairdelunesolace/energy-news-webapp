@@ -10,6 +10,8 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.List;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -46,26 +48,26 @@ class DailyBriefSecurityTest {
     @Test
     void authenticatedPostRequiresCsrf() throws Exception {
         mockMvc.perform(post("/api/daily-briefs/generate")
-                        .with(user("configured-admin"))
+                        .with(user("configured-admin").authorities(List.of()))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"watchlistId\":1}"))
                 .andExpect(status().isForbidden());
     }
 
     @Test
-    void authenticatedRequestsSucceedWithRequiredCsrf() throws Exception {
+    void authenticatedAccountWithoutRolesSucceedsWithRequiredCsrf() throws Exception {
         when(dailyBriefService.generate(any(GenerateDailyBriefRequest.class)))
                 .thenReturn(DailyBriefControllerTest.response());
         when(dailyBriefService.getById(1L)).thenReturn(DailyBriefControllerTest.response());
 
         mockMvc.perform(post("/api/daily-briefs/generate")
-                        .with(user("configured-admin"))
+                        .with(user("configured-admin").authorities(List.of()))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"watchlistId\":1}"))
                 .andExpect(status().isOk());
         mockMvc.perform(get("/api/daily-briefs/1")
-                        .with(user("configured-admin")))
+                        .with(user("configured-admin").authorities(List.of())))
                 .andExpect(status().isOk());
     }
 }

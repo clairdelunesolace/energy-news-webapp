@@ -119,7 +119,17 @@ class SecurityIntegrationTest {
                 .andExpect(jsonPath("$.token").isNotEmpty())
                 .andExpect(jsonPath("$.headerName").value("X-XSRF-TOKEN"))
                 .andExpect(cookie().exists("XSRF-TOKEN"))
-                .andExpect(cookie().httpOnly("XSRF-TOKEN", true));
+                .andExpect(cookie().httpOnly("XSRF-TOKEN", true))
+                .andExpect(cookie().attribute("XSRF-TOKEN", "SameSite", "Lax"));
+    }
+
+    @Test
+    void csrfCookieIsSecureWhenRequestIsHttps() throws Exception {
+        mockMvc.perform(get("/api/auth/csrf").secure(true))
+                .andExpect(status().isOk())
+                .andExpect(cookie().secure("XSRF-TOKEN", true))
+                .andExpect(cookie().httpOnly("XSRF-TOKEN", true))
+                .andExpect(cookie().attribute("XSRF-TOKEN", "SameSite", "Lax"));
     }
 
     @Test
@@ -143,8 +153,11 @@ class SecurityIntegrationTest {
         when(articleService.getAll(anyInt(), anyInt(), isNull(), isNull(), isNull()))
                 .thenReturn(emptyArticlePage());
         CsrfValues csrf = getCsrf(null);
+        MockHttpSession beforeLogin = new MockHttpSession();
+        String beforeLoginId = beforeLogin.getId();
 
         MvcResult loginResult = mockMvc.perform(post("/api/auth/login")
+                        .session(beforeLogin)
                         .cookie(csrf.cookie())
                         .header(csrf.headerName(), csrf.token())
                         .param("username", "configured-admin")
@@ -153,15 +166,21 @@ class SecurityIntegrationTest {
                 .andExpect(content().contentTypeCompatibleWith("application/json"))
                 .andExpect(jsonPath("$.authenticated").value(true))
                 .andExpect(jsonPath("$.username").value("configured-admin"))
+                .andExpect(jsonPath("$.password").doesNotExist())
+                .andExpect(jsonPath("$.credentials").doesNotExist())
                 .andReturn();
 
         MockHttpSession session = (MockHttpSession) loginResult.getRequest().getSession(false);
         assertThat(session).isNotNull();
+        assertThat(session.getId()).isNotEqualTo(beforeLoginId);
+        assertThat(objectMapper.readTree(loginResult.getResponse().getContentAsString()).size()).isEqualTo(2);
 
         mockMvc.perform(get("/api/auth/me").session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.authenticated").value(true))
-                .andExpect(jsonPath("$.username").value("configured-admin"));
+                .andExpect(jsonPath("$.username").value("configured-admin"))
+                .andExpect(jsonPath("$.password").doesNotExist())
+                .andExpect(jsonPath("$.credentials").doesNotExist());
         mockMvc.perform(get("/api/articles").session(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.page").value(0));

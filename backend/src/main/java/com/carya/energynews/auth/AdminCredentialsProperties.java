@@ -7,4 +7,8 @@ public record AdminCredentialsProperties(
         String username,
         String password
 ) {
+    @Override
+    public String toString() {
+        return "AdminCredentialsProperties[username=REDACTED, password=REDACTED]";
+    }
 }
