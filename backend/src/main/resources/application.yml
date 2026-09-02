@@ -21,6 +21,11 @@ app:
   daily-brief:
     zone: "${DAILY_BRIEF_ZONE:Asia/Shanghai}"
     max-items: ${DAILY_BRIEF_MAX_ITEMS:10}
+    scheduler:
+      enabled: ${DAILY_BRIEF_SCHEDULER_ENABLED:false}
+      cron: "${DAILY_BRIEF_SCHEDULER_CRON:0 40 10 * * *}"
+      zone: "${DAILY_BRIEF_SCHEDULER_ZONE:Asia/Shanghai}"
+      day-offset: ${DAILY_BRIEF_SCHEDULER_DAY_OFFSET:-1}
     ai:
       provider: "${DAILY_BRIEF_AI_PROVIDER:none}"
       model: "${DAILY_BRIEF_AI_MODEL:openai/gpt-oss-20b}"

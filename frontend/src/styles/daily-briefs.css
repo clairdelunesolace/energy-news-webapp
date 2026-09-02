@@ -37,6 +37,68 @@
   font-weight: 400;
 }
 
+.daily-brief-snapshot-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-3);
+  margin-top: var(--spacing-3);
+}
+
+.daily-brief-snapshot-actions .daily-brief-footnote {
+  margin: 0;
+}
+
+.daily-brief-selected-articles {
+  margin-top: var(--spacing-8);
+}
+
+.daily-brief-selected-articles > h2 {
+  margin: 0 0 var(--spacing-4);
+  font-size: 1.25rem;
+}
+
+.daily-brief-selected-articles > ol {
+  display: grid;
+  gap: var(--spacing-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.daily-brief-selected-articles article {
+  padding: var(--spacing-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-small);
+  background: var(--color-surface);
+}
+
+.daily-brief-selected-articles h3 {
+  display: flex;
+  gap: var(--spacing-3);
+  margin: 0;
+  font-size: 1.0625rem;
+  line-height: 1.6;
+}
+
+.daily-brief-selected-articles h3 span {
+  color: var(--color-accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.daily-brief-selected-articles h3 a {
+  color: inherit;
+  text-underline-offset: 0.18em;
+}
+
+.daily-brief-selected-articles article > p {
+  margin: var(--spacing-3) 0 0;
+  color: var(--color-text-secondary);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
 .daily-brief-actions {
   display: flex;
   flex-wrap: wrap;
