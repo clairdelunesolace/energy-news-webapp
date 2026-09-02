@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import {
   addKeyword,
   createWatchlist,
@@ -8,7 +9,13 @@ import {
   updateKeyword,
   updateWatchlist,
 } from '../api/watchlists'
+import { runWatchlistDiscovery } from '../api/watchlistDiscovery'
 import { ApiError } from '../api/client'
+import {
+  manualNewsRefreshErrorMessage,
+  manualNewsRefreshResultMessage,
+  runManualNewsRefresh,
+} from '../features/watchlists/manualNewsRefresh'
 import type { KeywordResponse, WatchlistResponse } from '../types/watchlists'
 
 type LoadStatus = 'loading' | 'success' | 'error'
@@ -218,7 +225,18 @@ function WatchlistSection({
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(watchlist.name)
   const [newKeyword, setNewKeyword] = useState('')
-  const disabled = pending !== null
+  const [keywordsUpdated, setKeywordsUpdated] = useState(false)
+  const [refreshStatus, setRefreshStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+  const [refreshMessage, setRefreshMessage] = useState<string | null>(null)
+  const refreshGuard = useRef({ current: false })
+  const disabled = pending !== null || refreshStatus === 'loading'
+  const hasEnabledKeyword = watchlist.keywords.some((keyword) => keyword.enabled)
+
+  const markKeywordsUpdated = () => {
+    setKeywordsUpdated(true)
+    setRefreshStatus('idle')
+    setRefreshMessage(null)
+  }
 
   const saveName = async (event: FormEvent) => {
     event.preventDefault()
@@ -269,6 +287,27 @@ function WatchlistSection({
     if (!created) return
     onKeywordAdded(created)
     setNewKeyword('')
+    markKeywordsUpdated()
+  }
+
+  const refreshNews = async () => {
+    if (refreshGuard.current.current) return
+    setRefreshStatus('loading')
+    setRefreshMessage(null)
+    try {
+      const response = await runManualNewsRefresh(
+        watchlist.id,
+        refreshGuard.current,
+        runWatchlistDiscovery,
+      )
+      if (!response) return
+      setKeywordsUpdated(false)
+      setRefreshStatus('success')
+      setRefreshMessage(manualNewsRefreshResultMessage(response))
+    } catch (error: unknown) {
+      setRefreshStatus('error')
+      setRefreshMessage(manualNewsRefreshErrorMessage(error))
+    }
   }
 
   return (
@@ -334,8 +373,14 @@ function WatchlistSection({
               keyword={keyword}
               pending={pending}
               performMutation={performMutation}
-              onChanged={onKeywordChanged}
-              onDeleted={onKeywordDeleted}
+              onChanged={(updated) => {
+                onKeywordChanged(updated)
+                markKeywordsUpdated()
+              }}
+              onDeleted={(id) => {
+                onKeywordDeleted(id)
+                markKeywordsUpdated()
+              }}
             />
           ))}
         </ul>
@@ -357,6 +402,33 @@ function WatchlistSection({
           </button>
         </div>
       </form>
+
+      <div className="watchlist-news-refresh" aria-busy={refreshStatus === 'loading'}>
+        <div className="watchlist-news-refresh__copy">
+          {keywordsUpdated ? (
+            <p className="watchlist-news-refresh__notice" role="status">关键词已更新，可立即刷新相关新闻。</p>
+          ) : (
+            <p>为“{watchlist.name}”发现昨天至今天的最新相关新闻。</p>
+          )}
+          {refreshMessage && (
+            <p
+              className={refreshStatus === 'error' ? 'watchlist-news-refresh__error' : 'watchlist-news-refresh__result'}
+              role={refreshStatus === 'error' ? 'alert' : 'status'}
+            >
+              {refreshMessage}
+              {refreshStatus === 'success' && <> <Link to="/">查看最新文章</Link></>}
+            </p>
+          )}
+        </div>
+        <button
+          className="button button--primary"
+          type="button"
+          onClick={refreshNews}
+          disabled={disabled || !watchlist.enabled || !hasEnabledKeyword}
+        >
+          {refreshStatus === 'loading' ? '正在刷新新闻...' : '立即刷新新闻'}
+        </button>
+      </div>
     </section>
   )
 }
