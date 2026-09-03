@@ -31,6 +31,7 @@ export interface ArticleResponse {
   translation: ArticleTranslationResponse | null
   createdAt: string
   updatedAt: string
+  tags: string[]
 }
 
 export type ArticlePostProcessingStepStatus = 'SUCCESS' | 'FAILED' | 'NOT_AVAILABLE'

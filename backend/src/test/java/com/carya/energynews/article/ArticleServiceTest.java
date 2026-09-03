@@ -9,11 +9,14 @@ import com.carya.energynews.translation.ArticleTranslationRepository;
 import com.carya.energynews.translation.ContentTranslationStatus;
 import com.carya.energynews.translation.TranslationLanguage;
 import com.carya.energynews.translation.TranslationStatus;
+import com.carya.energynews.watchlist.KeywordRepository;
+import com.carya.energynews.watchlist.WatchlistKeywordMatcher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageImpl;
@@ -29,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -44,6 +48,12 @@ class ArticleServiceTest {
 
     @Mock
     private ArticleTranslationRepository articleTranslationRepository;
+
+    @Mock
+    private KeywordRepository keywordRepository;
+
+    @Spy
+    private WatchlistKeywordMatcher watchlistKeywordMatcher = new WatchlistKeywordMatcher();
 
     @InjectMocks
     private ArticleService articleService;
@@ -112,7 +122,57 @@ class ArticleServiceTest {
         assertThat(page.totalPages()).isEqualTo(3);
         assertThat(page.first()).isFalse();
         assertThat(page.last()).isTrue();
-        verifyNoInteractions(articleTranslationRepository);
+        verifyNoInteractions(articleTranslationRepository, keywordRepository);
+    }
+
+    @Test
+    void derivesTagsFromOriginalMetadataAndLoadsKeywordsOnceForTheWholePage() {
+        Article first = article(1L, SourceLanguage.EN);
+        first.setTitle("Microgrid deployment");
+        first.setDescription("Battery storage expands");
+        first.setContent("Content-only keyword");
+        Article second = article(2L, SourceLanguage.EN);
+        second.setTitle("BESS project");
+        ArticleTranslation translation = translation(first, TranslationStatus.SUCCESS);
+        translation.setTitle("Translation-only keyword");
+        PageRequest pageRequest = PageRequest.of(0, 20);
+        when(articleRepository.findAllFiltered(null, "", null, pageRequest))
+                .thenReturn(new PageImpl<>(List.of(first, second), pageRequest, 2));
+        when(articleTranslationRepository.findAllByArticleIdInAndLanguageAndStatus(
+                List.of(1L, 2L), TranslationLanguage.ZH_CN, TranslationStatus.SUCCESS))
+                .thenReturn(List.of(translation));
+        when(keywordRepository.findEnabledKeywordTexts()).thenReturn(List.of(
+                "microgrid", "battery storage", "BESS", "Content-only", "Translation-only"));
+
+        ArticlePageResponse page = articleService.getAll(0, 20, null, null, null);
+
+        assertThat(page.content().getFirst().tags()).containsExactly("battery storage", "microgrid");
+        assertThat(page.content().getLast().tags()).containsExactly("BESS");
+        assertThat(page.content().getLast().translation()).isNull();
+        assertThat(page.content()).extracting(ArticleResponse::id).containsExactly(1L, 2L);
+        assertThat(page.content().getFirst().url()).isEqualTo(first.getUrl());
+        assertThat(page.content().getFirst().publishedAt()).isEqualTo(first.getPublishedAt());
+        assertThat(page.content().getFirst().collectedAt()).isEqualTo(first.getCollectedAt());
+        assertThat(page.content().getFirst().createdAt()).isEqualTo(first.getCreatedAt());
+        assertThat(page.content().getFirst().updatedAt()).isEqualTo(first.getUpdatedAt());
+        verify(keywordRepository).findEnabledKeywordTexts();
+    }
+
+    @Test
+    void detailTagsReflectCurrentKeywordsOnEachReadWithoutTranslationOrPersistence() {
+        Article article = article(SourceLanguage.EN);
+        article.setTitle("Microgrid with BESS");
+        when(articleRepository.findById(1L)).thenReturn(Optional.of(article));
+        when(keywordRepository.findEnabledKeywordTexts())
+                .thenReturn(List.of("microgrid"), List.of("BESS"), List.of());
+
+        assertThat(articleService.getById(1L).tags()).containsExactly("microgrid");
+        assertThat(articleService.getById(1L).tags()).containsExactly("BESS");
+        assertThat(articleService.getById(1L).tags()).isEmpty();
+
+        verify(keywordRepository, times(3)).findEnabledKeywordTexts();
+        verify(articleRepository, never()).save(any(Article.class));
+        verify(articleRepository, never()).saveAndFlush(any(Article.class));
     }
 
     @Test
@@ -263,6 +323,7 @@ class ArticleServiceTest {
         ArticleResponse response = articleService.getById(1L);
 
         assertThat(response.translation()).isNull();
+        assertThat(response.tags()).isEmpty();
     }
 
     @Test

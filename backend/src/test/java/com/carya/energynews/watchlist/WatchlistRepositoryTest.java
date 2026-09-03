@@ -22,6 +22,51 @@ class WatchlistRepositoryTest {
     private EntityManager entityManager;
 
     @Test
+    void onlyEnabledKeywordsProduceTagsWhenMatchingKeywordsHaveMixedEnabledStates() {
+        Watchlist active = new Watchlist("Active");
+        Keyword keyword = active.addKeyword("microgrid");
+        active.addKeyword("BESS").setEnabled(false);
+        Watchlist disabled = new Watchlist("Disabled");
+        disabled.setEnabled(false);
+        disabled.addKeyword("battery storage");
+        watchlistRepository.saveAndFlush(active);
+        watchlistRepository.saveAndFlush(disabled);
+
+        var keywords = keywordRepository.findEnabledKeywordTexts();
+        assertThat(keywords).containsExactlyInAnyOrder("microgrid", "battery storage");
+        assertThat(new WatchlistKeywordMatcher().matchTags(
+                "Microgrid with BESS", "Battery storage deployment", keywords))
+                .containsExactly("battery storage", "microgrid");
+
+        keyword.setKeyword("grid storage");
+        keywordRepository.flush();
+        watchlistRepository.delete(disabled);
+        watchlistRepository.flush();
+
+        assertThat(keywordRepository.findEnabledKeywordTexts())
+                .containsExactly("grid storage");
+    }
+
+    @Test
+    void enabledMatchingKeywordAppearsButDisablingTheOnlyMatchProducesEmptyTags() {
+        Watchlist watchlist = new Watchlist("Topics");
+        Keyword keyword = watchlist.addKeyword("microgrid");
+        watchlist.addKeyword("unmatched topic");
+        watchlistRepository.saveAndFlush(watchlist);
+        WatchlistKeywordMatcher matcher = new WatchlistKeywordMatcher();
+
+        assertThat(matcher.matchTags("Microgrid deployment", null,
+                keywordRepository.findEnabledKeywordTexts())).containsExactly("microgrid");
+
+        keyword.setEnabled(false);
+        keywordRepository.flush();
+
+        assertThat(keywordRepository.findEnabledKeywordTexts()).containsExactly("unmatched topic");
+        assertThat(matcher.matchTags("Microgrid deployment", null,
+                keywordRepository.findEnabledKeywordTexts())).isEmpty();
+    }
+
+    @Test
     void loadsAllWatchlistsWithKeywordsWithoutLazyCollectionQueries() {
         Watchlist topics = new Watchlist("Topics");
         topics.addKeyword("grid storage");

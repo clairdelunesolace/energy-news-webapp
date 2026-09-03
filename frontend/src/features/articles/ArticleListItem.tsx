@@ -34,6 +34,12 @@ export function ArticleListItem({ article }: ArticleListItemProps) {
           <Link to={`/articles/${article.id}`}>{primaryTitle}</Link>
         </h2>
 
+        {article.tags.length > 0 && (
+          <ul className="article-list-item__tags" aria-label="匹配关键词">
+            {article.tags.map((tag) => <li key={tag}>{tag}</li>)}
+          </ul>
+        )}
+
         {primaryDescription && (
           <p className="article-list-item__description" lang={primaryLanguage}>
             {primaryDescription}

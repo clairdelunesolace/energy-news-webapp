@@ -379,6 +379,26 @@ a {
   text-decoration-color: currentColor;
 }
 
+.article-list-item__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+  margin: 0 0 var(--spacing-3);
+  padding: 0;
+  list-style: none;
+}
+
+.article-list-item__tags li {
+  max-width: 100%;
+  padding: var(--spacing-1) var(--spacing-2);
+  border-radius: 999px;
+  background: var(--color-surface-muted);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
 .article-list-item__description {
   max-width: 52rem;
   margin: 0;

@@ -1,6 +1,7 @@
 package com.carya.energynews.article;
 
 import java.time.Instant;
+import java.util.List;
 
 public record ArticleResponse(
         Long id,
@@ -11,6 +12,7 @@ public record ArticleResponse(
         ArticleOriginalResponse original,
         ArticleTranslationResponse translation,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        List<String> tags
 ) {
 }

@@ -8,6 +8,8 @@ import com.carya.energynews.translation.ArticleTranslationRepository;
 import com.carya.energynews.translation.ContentTranslationStatus;
 import com.carya.energynews.translation.TranslationLanguage;
 import com.carya.energynews.translation.TranslationStatus;
+import com.carya.energynews.watchlist.KeywordRepository;
+import com.carya.energynews.watchlist.WatchlistKeywordMatcher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -26,15 +28,21 @@ public class ArticleService {
     private final ArticleRepository articleRepository;
     private final SourceRepository sourceRepository;
     private final ArticleTranslationRepository articleTranslationRepository;
+    private final KeywordRepository keywordRepository;
+    private final WatchlistKeywordMatcher watchlistKeywordMatcher;
 
     public ArticleService(
             ArticleRepository articleRepository,
             SourceRepository sourceRepository,
-            ArticleTranslationRepository articleTranslationRepository
+            ArticleTranslationRepository articleTranslationRepository,
+            KeywordRepository keywordRepository,
+            WatchlistKeywordMatcher watchlistKeywordMatcher
     ) {
         this.articleRepository = articleRepository;
         this.sourceRepository = sourceRepository;
         this.articleTranslationRepository = articleTranslationRepository;
+        this.keywordRepository = keywordRepository;
+        this.watchlistKeywordMatcher = watchlistKeywordMatcher;
     }
 
     @Transactional(readOnly = true)
@@ -48,8 +56,9 @@ public class ArticleService {
         );
         List<Article> articles = articlePage.getContent();
         Map<Long, ArticleTranslation> translations = loadSuccessfulTranslations(articles);
+        List<String> keywords = articles.isEmpty() ? List.of() : keywordRepository.findEnabledKeywordTexts();
         List<ArticleResponse> content = articles.stream()
-                .map(article -> toResponse(article, translations.get(article.getId())))
+                .map(article -> toResponse(article, translations.get(article.getId()), keywords))
                 .toList();
         return new ArticlePageResponse(
                 content,
@@ -80,7 +89,7 @@ public class ArticleService {
                         TranslationStatus.SUCCESS
                 )
                 .orElse(null);
-        return toResponse(article, translation);
+        return toResponse(article, translation, keywordRepository.findEnabledKeywordTexts());
     }
 
     @Transactional
@@ -128,7 +137,9 @@ public class ArticleService {
         return translationsByArticleId;
     }
 
-    private static ArticleResponse toResponse(Article article, ArticleTranslation translation) {
+    private ArticleResponse toResponse(
+            Article article, ArticleTranslation translation, List<String> keywords
+    ) {
         Source source = article.getSource();
         return new ArticleResponse(
                 article.getId(),
@@ -144,7 +155,8 @@ public class ArticleService {
                 ),
                 toTranslationResponse(translation),
                 article.getCreatedAt(),
-                article.getUpdatedAt()
+                article.getUpdatedAt(),
+                watchlistKeywordMatcher.matchTags(article.getTitle(), article.getDescription(), keywords)
         );
     }
 

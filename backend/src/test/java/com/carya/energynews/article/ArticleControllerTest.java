@@ -65,6 +65,8 @@ class ArticleControllerTest {
                 .andExpect(jsonPath("$.content[0].translation.language").value("ZH_CN"))
                 .andExpect(jsonPath("$.content[0].translation.title").value("电池储能扩张"))
                 .andExpect(jsonPath("$.content[0].translation.content").value("中文完整正文"))
+                .andExpect(jsonPath("$.content[0].tags.length()").value(1))
+                .andExpect(jsonPath("$.content[0].tags[0]").value("battery storage"))
                 .andExpect(jsonPath("$.content[0].displayTitle").doesNotExist())
                 .andExpect(jsonPath("$.page").value(0))
                 .andExpect(jsonPath("$.size").value(20))
@@ -188,10 +190,38 @@ class ArticleControllerTest {
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.url").value("https://example.com/articles/storage-expands"))
                 .andExpect(jsonPath("$.collectedAt").value("2026-08-19T06:00:00Z"))
+                .andExpect(jsonPath("$.publishedAt").value("2026-08-18T12:00:00Z"))
+                .andExpect(jsonPath("$.createdAt").value("2026-08-19T06:00:01Z"))
+                .andExpect(jsonPath("$.updatedAt").value("2026-08-19T06:00:01Z"))
                 .andExpect(jsonPath("$.source.id").value(7))
+                .andExpect(jsonPath("$.source.name").value("Energy Storage News"))
+                .andExpect(jsonPath("$.original.language").value("EN"))
                 .andExpect(jsonPath("$.original.title").value("Battery storage expands"))
+                .andExpect(jsonPath("$.original.description").value("Article summary"))
+                .andExpect(jsonPath("$.original.content").value("Article content"))
+                .andExpect(jsonPath("$.translation.language").value("ZH_CN"))
                 .andExpect(jsonPath("$.translation.title").value("电池储能扩张"))
+                .andExpect(jsonPath("$.translation.description").value("中文摘要"))
+                .andExpect(jsonPath("$.tags.length()").value(1))
+                .andExpect(jsonPath("$.tags[0]").value("battery storage"))
                 .andExpect(jsonPath("$.translation.content").value("中文完整正文"));
+    }
+
+    @Test
+    void serializesUnmatchedTagsAsAnEmptyArrayInListAndDetail() throws Exception {
+        ArticleResponse unmatched = articleResponse(List.of());
+        when(articleService.getById(1L)).thenReturn(unmatched);
+        when(articleService.getAll(0, 20, null, null, null)).thenReturn(new ArticlePageResponse(
+                List.of(unmatched), 0, 20, 1, 1, true, true));
+
+        mockMvc.perform(get("/api/articles/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tags").isArray())
+                .andExpect(jsonPath("$.tags").isEmpty());
+        mockMvc.perform(get("/api/articles"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].tags").isArray())
+                .andExpect(jsonPath("$.content[0].tags").isEmpty());
     }
 
     @Test
@@ -387,6 +417,10 @@ class ArticleControllerTest {
     }
 
     private static ArticleResponse articleResponse() {
+        return articleResponse(List.of("battery storage"));
+    }
+
+    private static ArticleResponse articleResponse(List<String> tags) {
         return new ArticleResponse(
                 1L,
                 new ArticleSourceResponse(7L, "Energy Storage News"),
@@ -406,7 +440,8 @@ class ArticleControllerTest {
                         "中文完整正文"
                 ),
                 CREATED_AT,
-                UPDATED_AT
+                UPDATED_AT,
+                tags
         );
     }
 
