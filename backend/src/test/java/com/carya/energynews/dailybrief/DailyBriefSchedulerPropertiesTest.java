@@ -48,7 +48,7 @@ class DailyBriefSchedulerPropertiesTest {
             assertThat(context).hasNotFailed().doesNotHaveBean(DailyBriefScheduler.class);
             DailyBriefSchedulerProperties properties = context.getBean(DailyBriefSchedulerProperties.class);
             assertThat(properties.enabled()).isFalse();
-            assertThat(properties.cron()).isEqualTo("0 40 10 * * *");
+            assertThat(properties.cron()).isEqualTo("0 10 8 * * *");
             assertThat(properties.zoneId()).isEqualTo(ZoneId.of("Asia/Shanghai"));
             assertThat(properties.dayOffset()).isEqualTo(-1);
             assertThat(context.getBean(ScheduledAnnotationBeanPostProcessor.class).getScheduledTasks()).isEmpty();

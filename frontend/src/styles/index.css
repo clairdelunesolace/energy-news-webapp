@@ -336,6 +336,14 @@ a {
   font-size: 0.8125rem;
 }
 
+.schedule-info {
+  margin: var(--spacing-2) 0;
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
 .article-feed__results {
   margin-top: var(--spacing-6);
 }

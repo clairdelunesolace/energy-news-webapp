@@ -23,7 +23,7 @@ app:
     max-items: ${DAILY_BRIEF_MAX_ITEMS:10}
     scheduler:
       enabled: ${DAILY_BRIEF_SCHEDULER_ENABLED:false}
-      cron: "${DAILY_BRIEF_SCHEDULER_CRON:0 40 10 * * *}"
+      cron: "${DAILY_BRIEF_SCHEDULER_CRON:0 10 8 * * *}"
       zone: "${DAILY_BRIEF_SCHEDULER_ZONE:Asia/Shanghai}"
       day-offset: ${DAILY_BRIEF_SCHEDULER_DAY_OFFSET:-1}
     ai:
@@ -36,7 +36,7 @@ app:
     provider: ${NEWS_DISCOVERY_PROVIDER:none}
     scheduler:
       enabled: ${NEWS_DISCOVERY_SCHEDULER_ENABLED:false}
-      cron: "${NEWS_DISCOVERY_SCHEDULER_CRON:0 30 20 * * *}"
+      cron: "${NEWS_DISCOVERY_SCHEDULER_CRON:0 0 8 * * *}"
       zone: "${NEWS_DISCOVERY_SCHEDULER_ZONE:Asia/Shanghai}"
       lookback-hours: ${NEWS_DISCOVERY_LOOKBACK_HOURS:36}
       limit-per-keyword: ${NEWS_DISCOVERY_LIMIT_PER_KEYWORD:5}

@@ -5,6 +5,7 @@ import { generateDailyBrief, generateDailyBriefAnalysis, getDailyBrief, getDaily
 import { getWatchlists } from '../api/watchlists'
 import type { DailyBriefAnalysisResponse, DailyBriefResponse } from '../types/dailyBriefs'
 import type { WatchlistResponse } from '../types/watchlists'
+import { ScheduleInfo } from '../features/system/ScheduleInfo'
 import '../styles/daily-briefs.css'
 
 const DAILY_BRIEF_TIME_ZONE = 'Asia/Shanghai'
@@ -52,6 +53,7 @@ export function DailyBriefsPage() {
           <h1 id="daily-brief-heading">每日情报简报</h1>
           <p>按关注主题与日期查看已生成的简报，聚焦值得关注的核心事件。</p>
         </header>
+        <ScheduleInfo kind="dailyBrief" />
 
         {watchlistStatus === 'loading' && <p role="status">正在加载关注主题…</p>}
         {watchlistStatus === 'error' && (

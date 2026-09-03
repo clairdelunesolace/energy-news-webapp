@@ -17,6 +17,7 @@ import {
   runManualNewsRefresh,
 } from '../features/watchlists/manualNewsRefresh'
 import type { KeywordResponse, WatchlistResponse } from '../types/watchlists'
+import { ScheduleInfo } from '../features/system/ScheduleInfo'
 
 type LoadStatus = 'loading' | 'success' | 'error'
 type PerformMutation = <T>(
@@ -134,6 +135,7 @@ export function WatchlistsPage() {
             </div>
           </form>
         </header>
+        <ScheduleInfo kind="newsDiscovery" />
 
         {operationError && (
           <p className="watchlists-page__operation-error" role="alert">

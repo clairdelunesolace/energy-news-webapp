@@ -6,6 +6,7 @@ import type { WatchlistResponse } from '../../types/watchlists'
 import { ArticleListItem } from './ArticleListItem'
 import { FeedToolbar } from './FeedToolbar'
 import { PaginationControls } from './PaginationControls'
+import { ScheduleInfo } from '../system/ScheduleInfo'
 
 const PAGE_SIZE = 20
 
@@ -96,6 +97,7 @@ export function ArticleFeed() {
         keywordsLoading={keywordsLoading}
         keywordsError={keywordsError}
       />
+      <ScheduleInfo kind="newsDiscovery" />
 
       <div className="article-feed__results" aria-live="polite" aria-busy={status === 'loading'}>
         {status === 'loading' && <p className="status-message">正在加载资讯…</p>}
