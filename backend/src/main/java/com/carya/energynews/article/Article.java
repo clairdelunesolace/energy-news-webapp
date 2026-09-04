@@ -30,11 +30,11 @@ public class Article {
     private Long id;
 
     @NotNull
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "text")
     private String title;
 
     @NotNull
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "text")
     private String url;
 
     @Column(columnDefinition = "text")
